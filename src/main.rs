@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 use midix::prelude::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
@@ -12,6 +12,16 @@ struct NoteBlock {
     key: Key,
     start_time: u32,
     stop_time: Option<u32>,
+}
+
+struct Channel {
+    number: u32,
+    curtime: u32,
+    note_blocks: Vec<NoteBlock>,
+}
+
+struct Song {
+    channels: HashMap<u32, Channel>,
 }
 
 #[macroquad::main("ZborroPianoApp")]
@@ -30,7 +40,9 @@ async fn main() {
         Ok(file) => file,
     };
 
-    let mut note_blocks_ch0 = vec![];
+    let mut song: Song = Song {
+        channels: HashMap::new(),
+    };
 
     let mut buf: Vec<u8> = vec![];
 
@@ -42,15 +54,14 @@ async fn main() {
 
     let mut reader = Reader::from_byte_slice(&buf);
 
-    let mut header: Option<RawHeaderChunk> = None;
+    let mut _header: Option<RawHeaderChunk> = None;
 
-    let mut curtime_ch0 = 0;
     loop {
         match reader.read_event() {
             Err(why) => panic!("failed to process event from midi: {}", why),
             Ok(FileEvent::Header(hdr)) => {
                 println!("header found");
-                header = Some(hdr);
+                _header = Some(hdr);
             }
             Ok(FileEvent::Track(_)) => {
                 println!("track found");
@@ -61,34 +72,34 @@ async fn main() {
                 match track_event.event() {
                     TrackMessage::ChannelVoice(cv) => {
                         let channel = cv.channel();
-                        if channel as u32 == 0 {
-                            curtime_ch0 += dt;
-                        }
+
+                        let channelObj = song.channels.entry(channel as u32).or_insert(Channel {
+                            number: channel as u32,
+                            curtime: 0,
+                            note_blocks: vec![],
+                        });
+                        channelObj.curtime += dt;
 
                         match cv.event() {
                             VoiceEvent::NoteOn { key, .. } => {
                                 println!("{} | ch:{} note on {}", dt, channel, key);
-                                if channel as u32 == 0 {
-                                    note_blocks_ch0.push(NoteBlock {
-                                        octave: key.octave(),
-                                        note: key.note(),
-                                        key: key.clone(),
-                                        start_time: curtime_ch0,
-                                        stop_time: None,
-                                    });
-                                }
+                                channelObj.note_blocks.push(NoteBlock {
+                                    octave: key.octave(),
+                                    note: key.note(),
+                                    key: key.clone(),
+                                    start_time: channelObj.curtime,
+                                    stop_time: None,
+                                });
                             }
                             VoiceEvent::NoteOff { key, .. } => {
                                 println!("{} | ch:{} note off {}", dt, channel, key);
 
-                                if channel as u32 == 0 {
-                                    for block in note_blocks_ch0.iter_mut().rev() {
-                                        if block.stop_time.is_none()
-                                            && block.octave == key.octave()
-                                            && block.note == key.note()
-                                        {
-                                            block.stop_time = Some(curtime_ch0);
-                                        }
+                                for block in channelObj.note_blocks.iter_mut().rev() {
+                                    if block.stop_time.is_none()
+                                        && block.octave == key.octave()
+                                        && block.note == key.note()
+                                    {
+                                        block.stop_time = Some(channelObj.curtime);
                                     }
                                 }
                             }
@@ -106,14 +117,6 @@ async fn main() {
             Ok(FileEvent::EOF) => break,
             Ok(_) => (),
         }
-    }
-
-    println!("collected notes, channel 0:");
-    for itm in note_blocks_ch0.iter() {
-        println!(
-            "{} {} {} {:?}",
-            itm.octave, itm.note, itm.start_time, itm.stop_time
-        );
     }
 
     let num_white_keys = 52;
@@ -139,7 +142,7 @@ async fn main() {
 
     let mut time_offset_y = 0.;
     let mut play = false;
-    let pixels_per_second = 100.;
+    let _pixels_per_second = 100.;
 
     loop {
         if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::Escape) {
@@ -188,36 +191,46 @@ async fn main() {
             );
         }
 
-        for itm in note_blocks_ch0.iter() {
-            let octave_offset = (itm.octave.value() - 1) as f32 * octave_w;
+        for (channelNumber, channelObj) in &song.channels {
+            for itm in channelObj.note_blocks.iter() {
+                let octave_offset = (itm.octave.value() - 1) as f32 * octave_w;
 
-            let note_offset = (white_piano_key_width + 3.)
-                * match itm.key.byte() % 12 {
-                    0 => 0.,    // C
-                    1 => 0.75,  // C#
-                    2 => 1.,    // D
-                    3 => 1.75,  // D#
-                    4 => 2.,    // E
-                    5 => 3.,    // F
-                    6 => 3.75,  // F#
-                    7 => 4.,    // G
-                    8 => 4.75,  // G#
-                    9 => 5.,    // A
-                    10 => 5.75, // A#
-                    11 => 6.,   // B
-                    _ => 0.,
+                let note_offset = (white_piano_key_width + 3.)
+                    * match itm.key.byte() % 12 {
+                        0 => 0.,    // C
+                        1 => 0.75,  // C#
+                        2 => 1.,    // D
+                        3 => 1.75,  // D#
+                        4 => 2.,    // E
+                        5 => 3.,    // F
+                        6 => 3.75,  // F#
+                        7 => 4.,    // G
+                        8 => 4.75,  // G#
+                        9 => 5.,    // A
+                        10 => 5.75, // A#
+                        11 => 6.,   // B
+                        _ => 0.,
+                    };
+
+                let block_x = c1_offset + octave_offset + note_offset;
+                let block_y = (itm.start_time as f32) / 10.;
+                let block_w = if itm.key.is_sharp() {
+                    black_piano_key_width
+                } else {
+                    white_piano_key_width
+                };
+                let block_h = (itm.stop_time.unwrap() - itm.start_time) as f32 / 10.;
+
+                let color = match channelNumber {
+                    0 => GREEN,
+                    1 => DARKGREEN,
+                    2 => BLUE,
+                    3 => DARKBLUE,
+                    _ => GRAY,
                 };
 
-            let block_x = c1_offset + octave_offset + note_offset;
-            let block_y = (itm.start_time as f32) / 10.;
-            let block_w = if itm.key.is_sharp() {
-                black_piano_key_width
-            } else {
-                white_piano_key_width
-            };
-            let block_h = (itm.stop_time.unwrap() - itm.start_time) as f32 / 10.;
-
-            draw_rectangle(block_x, block_y - time_offset_y, block_w, block_h, GREEN);
+                draw_rectangle(block_x, block_y - time_offset_y, block_w, block_h, color);
+            }
         }
 
         set_default_camera();
