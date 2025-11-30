@@ -140,6 +140,11 @@ async fn main() {
     let mut time_offset_y = 0.;
 
     loop {
+        if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::Escape) {
+            return;
+        }
+
+
         if screen_width() != last_screen_width {
             render_target_0 = render_target(screen_width() as u32, (screen_height() - 200.) as u32);
             midi_target_cam = Camera2D::from_display_rect(Rect::new(
