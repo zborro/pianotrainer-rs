@@ -6,6 +6,14 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
+struct NoteBlock {
+    octave: Octave,
+    note: Note,
+    key: Key,
+    start_time: u32,
+    stop_time: Option<u32>,
+}
+
 #[macroquad::main("ZborroPianoApp")]
 async fn main() {
     if env::args().len() != 2 {
@@ -22,6 +30,8 @@ async fn main() {
         Ok(file) => file,
     };
 
+    let mut note_blocks_ch0 = vec![];
+
     let mut buf: Vec<u8> = vec![];
 
     if let Err(why) = file.read_to_end(&mut buf) {
@@ -34,6 +44,7 @@ async fn main() {
 
     let mut header: Option<RawHeaderChunk> = None;
 
+    let mut curtime_ch0 = 0;
     loop {
         match reader.read_event() {
             Err(why) => panic!("failed to process event from midi: {}", why),
@@ -41,7 +52,7 @@ async fn main() {
                 println!("header found");
                 header = Some(hdr);
             }
-            Ok(FileEvent::Track(track)) => {
+            Ok(FileEvent::Track(_)) => {
                 println!("track found");
             }
             Ok(FileEvent::TrackEvent(track_event)) => {
@@ -50,13 +61,36 @@ async fn main() {
                 match track_event.event() {
                     TrackMessage::ChannelVoice(cv) => {
                         let channel = cv.channel();
+                        if channel as u32 == 0 {
+                            curtime_ch0 += dt;
+                        }
 
                         match cv.event() {
                             VoiceEvent::NoteOn { key, .. } => {
                                 println!("{} | ch:{} note on {}", dt, channel, key);
+                                if channel as u32 == 0 {
+                                    note_blocks_ch0.push(NoteBlock {
+                                        octave: key.octave(),
+                                        note: key.note(),
+                                        key: key.clone(),
+                                        start_time: curtime_ch0,
+                                        stop_time: None,
+                                    });
+                                }
                             }
                             VoiceEvent::NoteOff { key, .. } => {
                                 println!("{} | ch:{} note off {}", dt, channel, key);
+
+                                if channel as u32 == 0 {
+                                    for block in note_blocks_ch0.iter_mut().rev() {
+                                        if block.stop_time.is_none()
+                                            && block.octave == key.octave()
+                                            && block.note == key.note()
+                                        {
+                                            block.stop_time = Some(curtime_ch0);
+                                        }
+                                    }
+                                }
                             }
                             VoiceEvent::Aftertouch { .. } => {}
                             VoiceEvent::ControlChange { .. } => (),
@@ -74,6 +108,14 @@ async fn main() {
         }
     }
 
+    println!("collected notes, channel 0:");
+    for itm in note_blocks_ch0.iter() {
+        println!(
+            "{} {} {} {:?}",
+            itm.octave, itm.note, itm.start_time, itm.stop_time
+        );
+    }
+
     let num_white_keys = 52;
     let piano_key_margin = 1.;
 
@@ -82,11 +124,91 @@ async fn main() {
         34, 35, 37, 38, 40, 41, 42, 44, 45, 47, 48, 49,
     ]);
 
+    let white_piano_key_height = 200.;
+
+    let mut last_screen_width = screen_width();
+
+    let mut render_target_0 = render_target(screen_width() as u32, (screen_height() - 200.) as u32);
+    let mut midi_target_cam = Camera2D::from_display_rect(Rect::new(
+        0.,
+        0.,
+        screen_width(),
+        screen_height() - white_piano_key_height,
+    ));
+    midi_target_cam.render_target = Some(render_target_0.clone());
+
+    let mut time_offset_y = 0.;
+
     loop {
-        let white_piano_key_height = 200.;
+        if screen_width() != last_screen_width {
+            render_target_0 = render_target(screen_width() as u32, (screen_height() - 200.) as u32);
+            midi_target_cam = Camera2D::from_display_rect(Rect::new(
+                0.,
+                0.,
+                screen_width(),
+                screen_height() - white_piano_key_height,
+            ));
+            midi_target_cam.render_target = Some(render_target_0.clone());
+            last_screen_width = screen_width();
+        }
+
+        time_offset_y += get_frame_time() * 200.;
+
         let white_piano_key_width = (screen_width() / ((num_white_keys + 1) as f32)) - 2.;
         let black_piano_key_height = 130.;
         let black_piano_key_width = white_piano_key_width * 0.5;
+
+        set_camera(&midi_target_cam);
+
+        clear_background(BLACK);
+
+        let c1_offset = (white_piano_key_width + 2.) * 2. + 1.;
+        let octave_w = (white_piano_key_width + 3.) * 7.;
+
+        for i in 0..8 {
+            draw_line(
+                c1_offset + i as f32 * octave_w,
+                0.,
+                c1_offset + i as f32 * octave_w,
+                screen_height(),
+                1.,
+                GRAY,
+            );
+        }
+
+        for itm in note_blocks_ch0.iter() {
+            let octave_offset = (itm.octave.value() - 1) as f32 * octave_w;
+
+            let note_offset = (white_piano_key_width + 3.)
+                * match itm.key.byte() % 12 {
+                    0 => 0.,    // C
+                    1 => 0.75,  // C#
+                    2 => 1.,    // D
+                    3 => 1.75,  // D#
+                    4 => 2.,    // E
+                    5 => 3.,    // F
+                    6 => 3.75,  // F#
+                    7 => 4.,    // G
+                    8 => 4.75,  // G#
+                    9 => 5.,    // A
+                    10 => 5.75, // A#
+                    11 => 6.,   // B
+                    _ => 0.,
+                };
+
+            let block_x = c1_offset + octave_offset + note_offset;
+            let block_y = (itm.start_time as f32) / 10.;
+            let block_w = if itm.key.is_sharp() {
+                black_piano_key_width
+            } else {
+                white_piano_key_width
+            };
+            let block_h = (itm.stop_time.unwrap() - itm.start_time) as f32 / 10.;
+
+            draw_rectangle(block_x, block_y - time_offset_y, block_w, block_h, GREEN);
+        }
+
+        set_default_camera();
 
         clear_background(GRAY);
 
@@ -106,6 +228,18 @@ async fn main() {
                 );
             }
         }
+
+        draw_texture_ex(
+            &render_target_0.texture,
+            0.,
+            0.,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(vec2(screen_width() as f32, (screen_height() - 200.) as f32)),
+                ..Default::default()
+            },
+        );
+
         next_frame().await
     }
 }
