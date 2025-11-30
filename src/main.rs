@@ -138,12 +138,17 @@ async fn main() {
     midi_target_cam.render_target = Some(render_target_0.clone());
 
     let mut time_offset_y = 0.;
+    let mut play = false;
+    let pixels_per_second = 100.;
 
     loop {
         if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::Escape) {
             return;
         }
 
+        if is_key_pressed(KeyCode::Space) {
+            play = !play;
+        }
 
         if screen_width() != last_screen_width {
             render_target_0 = render_target(screen_width() as u32, (screen_height() - 200.) as u32);
@@ -157,7 +162,9 @@ async fn main() {
             last_screen_width = screen_width();
         }
 
-        time_offset_y += get_frame_time() * 200.;
+        if play {
+            time_offset_y += get_frame_time() * 200.;
+        }
 
         let white_piano_key_width = (screen_width() / ((num_white_keys + 1) as f32)) - 2.;
         let black_piano_key_height = 130.;
