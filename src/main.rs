@@ -221,15 +221,24 @@ async fn main() {
                 };
                 let block_h = (itm.stop_time.unwrap() - itm.start_time) as f32 / 10.;
 
-                let color = match channelNumber {
+                let sharp_color = match channelNumber {
                     0 => GREEN,
-                    1 => DARKGREEN,
-                    2 => BLUE,
-                    3 => DARKBLUE,
+                    1 => BLUE,
+                    2 => PURPLE,
+                    3 => YELLOW,
                     _ => GRAY,
                 };
 
-                draw_rectangle(block_x, block_y - time_offset_y, block_w, block_h, color);
+                let flat_color = match channelNumber {
+                    0 => DARKGREEN,
+                    1 => DARKBLUE,
+                    2 => DARKPURPLE,
+                    3 => ORANGE,
+                    _ => GRAY,
+                };
+
+
+                draw_rectangle(block_x, block_y - time_offset_y, block_w, block_h, if (itm.note.is_flat()) { flat_color } else { sharp_color });
             }
         }
 
