@@ -1,28 +1,9 @@
 use macroquad::prelude::*;
-use midix::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::env;
-use std::fs::File;
-use std::io::prelude::*;
 use std::path::Path;
 
-struct NoteBlock {
-    octave: Octave,
-    note: Note,
-    key: Key,
-    start_time: u32,
-    stop_time: Option<u32>,
-}
-
-struct Channel {
-    number: u32,
-    curtime: u32,
-    note_blocks: Vec<NoteBlock>,
-}
-
-struct Song {
-    channels: HashMap<u32, Channel>,
-}
+mod song;
 
 #[macroquad::main("ZborroPianoApp")]
 async fn main() {
@@ -32,92 +13,9 @@ async fn main() {
 
     let path_string = env::args().nth(1).unwrap();
     let path = Path::new(&path_string);
-    let display = path.display();
 
-    println!("trying to open file {display}");
-    let mut file = match File::open(path) {
-        Err(why) => panic!("could not open {}: {}", display, why),
-        Ok(file) => file,
-    };
+    let song = song::load_song(path);
 
-    let mut song: Song = Song {
-        channels: HashMap::new(),
-    };
-
-    let mut buf: Vec<u8> = vec![];
-
-    if let Err(why) = file.read_to_end(&mut buf) {
-        panic!("error reading from file {}: {}", display, why);
-    }
-
-    println!("read the file. its len: {}", buf.len());
-
-    let mut reader = Reader::from_byte_slice(&buf);
-
-    let mut _header: Option<RawHeaderChunk> = None;
-
-    loop {
-        match reader.read_event() {
-            Err(why) => panic!("failed to process event from midi: {}", why),
-            Ok(FileEvent::Header(hdr)) => {
-                println!("header found");
-                _header = Some(hdr);
-            }
-            Ok(FileEvent::Track(_)) => {
-                println!("track found");
-            }
-            Ok(FileEvent::TrackEvent(track_event)) => {
-                let dt = track_event.delta_ticks();
-
-                match track_event.event() {
-                    TrackMessage::ChannelVoice(cv) => {
-                        let channel = cv.channel();
-
-                        let channelObj = song.channels.entry(channel as u32).or_insert(Channel {
-                            number: channel as u32,
-                            curtime: 0,
-                            note_blocks: vec![],
-                        });
-                        channelObj.curtime += dt;
-
-                        match cv.event() {
-                            VoiceEvent::NoteOn { key, .. } => {
-                                println!("{} | ch:{} note on {}", dt, channel, key);
-                                channelObj.note_blocks.push(NoteBlock {
-                                    octave: key.octave(),
-                                    note: key.note(),
-                                    key: key.clone(),
-                                    start_time: channelObj.curtime,
-                                    stop_time: None,
-                                });
-                            }
-                            VoiceEvent::NoteOff { key, .. } => {
-                                println!("{} | ch:{} note off {}", dt, channel, key);
-
-                                for block in channelObj.note_blocks.iter_mut().rev() {
-                                    if block.stop_time.is_none()
-                                        && block.octave == key.octave()
-                                        && block.note == key.note()
-                                    {
-                                        block.stop_time = Some(channelObj.curtime);
-                                    }
-                                }
-                            }
-                            VoiceEvent::Aftertouch { .. } => {}
-                            VoiceEvent::ControlChange { .. } => (),
-                            VoiceEvent::ProgramChange { .. } => (),
-                            VoiceEvent::ChannelPressureAfterTouch { .. } => (),
-                            VoiceEvent::PitchBend { .. } => (),
-                        }
-                    }
-                    TrackMessage::SystemExclusive(_) => {}
-                    TrackMessage::Meta(_) => {}
-                }
-            }
-            Ok(FileEvent::EOF) => break,
-            Ok(_) => (),
-        }
-    }
 
     let num_white_keys = 52;
     let piano_key_margin = 1.;
@@ -191,8 +89,8 @@ async fn main() {
             );
         }
 
-        for (channelNumber, channelObj) in &song.channels {
-            for itm in channelObj.note_blocks.iter() {
+        for (channel_number, channel_obj) in &song.channels {
+            for itm in channel_obj.note_blocks.iter() {
                 let octave_offset = (itm.octave.value() - 1) as f32 * octave_w;
 
                 let note_offset = (white_piano_key_width + 3.)
@@ -221,7 +119,7 @@ async fn main() {
                 };
                 let block_h = (itm.stop_time.unwrap() - itm.start_time) as f32 / 10.;
 
-                let sharp_color = match channelNumber {
+                let sharp_color = match channel_number {
                     0 => GREEN,
                     1 => BLUE,
                     2 => PURPLE,
@@ -229,7 +127,7 @@ async fn main() {
                     _ => GRAY,
                 };
 
-                let flat_color = match channelNumber {
+                let flat_color = match channel_number {
                     0 => DARKGREEN,
                     1 => DARKBLUE,
                     2 => DARKPURPLE,
@@ -238,7 +136,7 @@ async fn main() {
                 };
 
 
-                draw_rectangle(block_x, block_y - time_offset_y, block_w, block_h, if (itm.note.is_flat()) { flat_color } else { sharp_color });
+                draw_rectangle(block_x, block_y - time_offset_y, block_w, block_h, if itm.note.is_flat() { flat_color } else { sharp_color });
             }
         }
 
