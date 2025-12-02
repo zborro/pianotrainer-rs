@@ -1,0 +1,212 @@
+use std::collections::HashSet;
+
+use macroquad::experimental::scene::{Node, RefMut};
+use macroquad::prelude::*;
+
+use crate::song;
+
+pub struct PianoScreen {
+    song: song::Song,
+    play: bool,
+    time_offset_y: f32,
+    num_white_keys: u32,
+    piano_key_margin: f32,
+    white_piano_key_width: f32,
+    white_piano_key_height: f32,
+    black_piano_key_width: f32,
+    black_piano_key_height: f32,
+}
+
+impl PianoScreen {
+    pub fn recalculate(&mut self, width: f32, _height: f32) {
+        self.white_piano_key_height = 200.;
+        self.white_piano_key_width = (width / ((self.num_white_keys + 1) as f32)) - 2.;
+        self.black_piano_key_height = 130.;
+        self.black_piano_key_width = self.white_piano_key_width * 0.5;
+    }
+
+    pub fn new(song: song::Song) -> PianoScreen {
+        let mut ps = PianoScreen {
+            song: song,
+            play: false,
+            time_offset_y: 0.,
+            num_white_keys: 52,
+            piano_key_margin: 1.,
+            white_piano_key_width: 0.,
+            white_piano_key_height: 0.,
+            black_piano_key_width: 0.,
+            black_piano_key_height: 0.,
+        };
+        ps.recalculate(screen_width(), screen_height());
+        ps
+    }
+
+    pub fn on_screen_resize(&mut self) {
+        self.recalculate(screen_width(), screen_height());
+    }
+
+    fn draw_piano_keyboard(&self) {
+        clear_background(GRAY);
+
+        let black_key_positions: HashSet<i32> = HashSet::from([
+            0, 2, 3, 5, 6, 7, 9, 10, 12, 13, 14, 16, 17, 19, 20, 21, 23, 24, 26, 27, 28, 30, 31,
+            33, 34, 35, 37, 38, 40, 41, 42, 44, 45, 47, 48, 49,
+        ]);
+
+        for i in 0..(self.num_white_keys as i32) {
+            let x = (i as f32) * (self.white_piano_key_width + self.piano_key_margin)
+                + (i as f32 * self.piano_key_margin * 2.);
+            draw_rectangle(
+                x,
+                0.,
+                self.white_piano_key_width,
+                self.white_piano_key_height,
+                WHITE,
+            );
+
+            if black_key_positions.contains(&((i - 1) as i32)) {
+                draw_rectangle(
+                    x - (self.black_piano_key_width / 2.) - 2.,
+                    self.white_piano_key_height - self.black_piano_key_height,
+                    self.black_piano_key_width,
+                    self.black_piano_key_height,
+                    BLACK,
+                );
+            }
+        }
+    }
+
+    fn draw_song_timeline(&self) {
+        let midi_render_target = render_target(
+            screen_width() as u32,
+            (screen_height() - self.white_piano_key_height) as u32,
+        );
+        let mut midi_target_cam = Camera2D::from_display_rect(Rect::new(
+            0.,
+            0.,
+            screen_width(),
+            screen_height() - self.white_piano_key_height,
+        ));
+        midi_target_cam.render_target = Some(midi_render_target.clone());
+
+        set_camera(&midi_target_cam);
+        clear_background(BLACK);
+
+        let c1_offset = (self.white_piano_key_width + 2.) * 2. + 1.;
+        let octave_w = (self.white_piano_key_width + 3.) * 7.;
+
+        for i in 0..8 {
+            draw_line(
+                c1_offset + i as f32 * octave_w,
+                0.,
+                c1_offset + i as f32 * octave_w,
+                screen_height(),
+                1.,
+                GRAY,
+            );
+        }
+
+        for (channel_number, channel_obj) in &self.song.channels {
+            for itm in channel_obj.note_blocks.iter() {
+                let octave_offset = (itm.octave.value() - 1) as f32 * octave_w;
+
+                let note_offset = (self.white_piano_key_width + 3.)
+                    * match itm.key.byte() % 12 {
+                        0 => 0.,    // C
+                        1 => 0.75,  // C#
+                        2 => 1.,    // D
+                        3 => 1.75,  // D#
+                        4 => 2.,    // E
+                        5 => 3.,    // F
+                        6 => 3.75,  // F#
+                        7 => 4.,    // G
+                        8 => 4.75,  // G#
+                        9 => 5.,    // A
+                        10 => 5.75, // A#
+                        11 => 6.,   // B
+                        _ => 0.,
+                    };
+
+                let block_x = c1_offset + octave_offset + note_offset;
+                let block_y = (itm.start_time as f32) / 10.;
+                let block_w = if itm.key.is_sharp() {
+                    self.black_piano_key_width
+                } else {
+                    self.white_piano_key_width
+                };
+                let block_h = (itm.stop_time.unwrap() - itm.start_time) as f32 / 10.;
+
+                let sharp_color = match channel_number {
+                    0 => GREEN,
+                    1 => BLUE,
+                    2 => PURPLE,
+                    3 => YELLOW,
+                    _ => GRAY,
+                };
+
+                let flat_color = match channel_number {
+                    0 => DARKGREEN,
+                    1 => DARKBLUE,
+                    2 => DARKPURPLE,
+                    3 => ORANGE,
+                    _ => GRAY,
+                };
+
+                draw_rectangle(
+                    block_x,
+                    block_y - self.time_offset_y,
+                    block_w,
+                    block_h,
+                    if itm.note.is_flat() {
+                        flat_color
+                    } else {
+                        sharp_color
+                    },
+                );
+            }
+        }
+
+        set_default_camera();
+
+        draw_texture_ex(
+            &midi_render_target.texture,
+            0.,
+            0.,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(vec2(
+                    screen_width() as f32,
+                    (screen_height() - self.white_piano_key_height) as f32,
+                )),
+                ..Default::default()
+            },
+        );
+    }
+
+    pub fn toggle_play(&mut self) {
+        self.play = !self.play;
+    }
+
+    pub fn update(&mut self, frame_time: f32) {
+        if self.play {
+            self.time_offset_y += frame_time * 200.;
+        }
+    }
+}
+
+impl Node for PianoScreen {
+    fn ready(_node: RefMut<Self>) {}
+
+    fn draw(node: RefMut<Self>) {
+        node.draw_piano_keyboard();
+        node.draw_song_timeline();
+    }
+
+    fn update(mut node: RefMut<Self>) {
+        if is_key_pressed(KeyCode::Space) {
+            node.toggle_play();
+        }
+
+        node.update(get_frame_time());
+    }
+}

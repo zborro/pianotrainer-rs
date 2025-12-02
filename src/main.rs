@@ -1,11 +1,11 @@
 use macroquad::prelude::*;
-use std::collections::HashSet;
 use std::env;
 use std::path::Path;
 
 mod song;
+mod screen;
 
-#[macroquad::main("ZborroPianoApp")]
+#[macroquad::main("zborro-piano-trainer")]
 async fn main() {
     if env::args().len() != 2 {
         panic!("ERROR : wrong number of arguments! Expected file as arg");
@@ -16,161 +16,25 @@ async fn main() {
 
     let song = song::load_song(path);
 
-
-    let num_white_keys = 52;
-    let piano_key_margin = 1.;
-
-    let black_key_positions: HashSet<i32> = HashSet::from([
-        0, 2, 3, 5, 6, 7, 9, 10, 12, 13, 14, 16, 17, 19, 20, 21, 23, 24, 26, 27, 28, 30, 31, 33,
-        34, 35, 37, 38, 40, 41, 42, 44, 45, 47, 48, 49,
-    ]);
-
-    let white_piano_key_height = 200.;
-
     let mut last_screen_width = screen_width();
+    let piano_screen_handle = scene::add_node(screen::PianoScreen::new(song));
 
-    let mut render_target_0 = render_target(screen_width() as u32, (screen_height() - 200.) as u32);
-    let mut midi_target_cam = Camera2D::from_display_rect(Rect::new(
-        0.,
-        0.,
-        screen_width(),
-        screen_height() - white_piano_key_height,
-    ));
-    midi_target_cam.render_target = Some(render_target_0.clone());
-
-    let mut time_offset_y = 0.;
-    let mut play = false;
-    let _pixels_per_second = 100.;
+    let mut camera = Camera2D::from_display_rect(Rect::new(0., 0., screen_width(), screen_height()));
+    scene::set_camera(0, Some(camera));
 
     loop {
         if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::Escape) {
             return;
         }
 
-        if is_key_pressed(KeyCode::Space) {
-            play = !play;
-        }
-
         if screen_width() != last_screen_width {
-            render_target_0 = render_target(screen_width() as u32, (screen_height() - 200.) as u32);
-            midi_target_cam = Camera2D::from_display_rect(Rect::new(
-                0.,
-                0.,
-                screen_width(),
-                screen_height() - white_piano_key_height,
-            ));
-            midi_target_cam.render_target = Some(render_target_0.clone());
+            scene::get_node(piano_screen_handle).on_screen_resize();
+
+            camera = Camera2D::from_display_rect(Rect::new(0., 0., screen_width(), screen_height()));
+            scene::set_camera(0, Some(camera));
+
             last_screen_width = screen_width();
         }
-
-        if play {
-            time_offset_y += get_frame_time() * 200.;
-        }
-
-        let white_piano_key_width = (screen_width() / ((num_white_keys + 1) as f32)) - 2.;
-        let black_piano_key_height = 130.;
-        let black_piano_key_width = white_piano_key_width * 0.5;
-
-        set_camera(&midi_target_cam);
-
-        clear_background(BLACK);
-
-        let c1_offset = (white_piano_key_width + 2.) * 2. + 1.;
-        let octave_w = (white_piano_key_width + 3.) * 7.;
-
-        for i in 0..8 {
-            draw_line(
-                c1_offset + i as f32 * octave_w,
-                0.,
-                c1_offset + i as f32 * octave_w,
-                screen_height(),
-                1.,
-                GRAY,
-            );
-        }
-
-        for (channel_number, channel_obj) in &song.channels {
-            for itm in channel_obj.note_blocks.iter() {
-                let octave_offset = (itm.octave.value() - 1) as f32 * octave_w;
-
-                let note_offset = (white_piano_key_width + 3.)
-                    * match itm.key.byte() % 12 {
-                        0 => 0.,    // C
-                        1 => 0.75,  // C#
-                        2 => 1.,    // D
-                        3 => 1.75,  // D#
-                        4 => 2.,    // E
-                        5 => 3.,    // F
-                        6 => 3.75,  // F#
-                        7 => 4.,    // G
-                        8 => 4.75,  // G#
-                        9 => 5.,    // A
-                        10 => 5.75, // A#
-                        11 => 6.,   // B
-                        _ => 0.,
-                    };
-
-                let block_x = c1_offset + octave_offset + note_offset;
-                let block_y = (itm.start_time as f32) / 10.;
-                let block_w = if itm.key.is_sharp() {
-                    black_piano_key_width
-                } else {
-                    white_piano_key_width
-                };
-                let block_h = (itm.stop_time.unwrap() - itm.start_time) as f32 / 10.;
-
-                let sharp_color = match channel_number {
-                    0 => GREEN,
-                    1 => BLUE,
-                    2 => PURPLE,
-                    3 => YELLOW,
-                    _ => GRAY,
-                };
-
-                let flat_color = match channel_number {
-                    0 => DARKGREEN,
-                    1 => DARKBLUE,
-                    2 => DARKPURPLE,
-                    3 => ORANGE,
-                    _ => GRAY,
-                };
-
-
-                draw_rectangle(block_x, block_y - time_offset_y, block_w, block_h, if itm.note.is_flat() { flat_color } else { sharp_color });
-            }
-        }
-
-        set_default_camera();
-
-        clear_background(GRAY);
-
-        for i in 0..num_white_keys {
-            let x = (i as f32) * (white_piano_key_width + piano_key_margin)
-                + (i as f32 * piano_key_margin * 2.);
-            let y = screen_height() - white_piano_key_height;
-            draw_rectangle(x, y, white_piano_key_width, white_piano_key_height, WHITE);
-
-            if black_key_positions.contains(&(i - 1)) {
-                draw_rectangle(
-                    x - (black_piano_key_width / 2.) - 2.,
-                    y,
-                    black_piano_key_width,
-                    black_piano_key_height,
-                    BLACK,
-                );
-            }
-        }
-
-        draw_texture_ex(
-            &render_target_0.texture,
-            0.,
-            0.,
-            WHITE,
-            DrawTextureParams {
-                dest_size: Some(vec2(screen_width() as f32, (screen_height() - 200.) as f32)),
-                ..Default::default()
-            },
-        );
 
         next_frame().await
     }
