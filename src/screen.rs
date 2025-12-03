@@ -8,6 +8,7 @@ use crate::song;
 pub struct PianoScreen {
     song: song::Song,
     play: bool,
+    time_offset: f32,
     time_offset_y: f32,
     num_white_keys: u32,
     piano_key_margin: f32,
@@ -43,6 +44,7 @@ impl PianoScreen {
         let mut ps = PianoScreen {
             song: song,
             play: false,
+            time_offset: 0.,
             time_offset_y: 0.,
             num_white_keys: 52,
             piano_key_margin: 1.,
@@ -185,6 +187,8 @@ impl PianoScreen {
                 ..Default::default()
             },
         );
+
+        draw_text(&format!("t: {}s", self.time_offset), 10., 40., 32., RED);
     }
 
     pub fn toggle_play(&mut self) {
@@ -193,8 +197,13 @@ impl PianoScreen {
 
     pub fn update(&mut self, frame_time: f32) {
         if self.play {
+            self.time_offset += frame_time;
             self.time_offset_y += frame_time * 200.;
         }
+    }
+
+    pub fn on_piano_key(&mut self, key: u32) {
+        println!("piano key event! {}", key);
     }
 }
 
