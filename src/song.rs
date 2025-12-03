@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::path::Path;
 use std::fs::File;
 use std::io::prelude::*;
+use std::path::Path;
 
 use midix::prelude::*;
 
@@ -50,8 +50,7 @@ pub fn load_song(path: &Path) -> Song {
             Ok(FileEvent::Header(hdr)) => {
                 _header = Some(hdr);
             }
-            Ok(FileEvent::Track(_)) => {
-            }
+            Ok(FileEvent::Track(_)) => {}
             Ok(FileEvent::TrackEvent(track_event)) => {
                 let dt = track_event.delta_ticks();
 
@@ -103,5 +102,3 @@ pub fn load_song(path: &Path) -> Song {
 
     song
 }
-
-

@@ -5,5 +5,7 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4.5.53", features = ["derive"] }
+env_logger = "0.11.8"
 macroquad = "0.4.14"
+midir = "0.10.3"
 midix = "3.2.0"
