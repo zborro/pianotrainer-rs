@@ -1,9 +1,7 @@
 use clap::Parser;
-use env_logger;
 use macroquad::prelude::*;
 use midir::{Ignore, MidiInput};
 use std::error::Error;
-use std::io::{Write, stdin, stdout};
 use std::path::PathBuf;
 
 mod screen;
