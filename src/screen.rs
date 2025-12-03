@@ -15,6 +15,8 @@ pub struct PianoScreen {
     white_piano_key_height: f32,
     black_piano_key_width: f32,
     black_piano_key_height: f32,
+    midi_render_target: RenderTarget,
+    midi_target_cam: Camera2D,
 }
 
 impl PianoScreen {
@@ -23,6 +25,18 @@ impl PianoScreen {
         self.white_piano_key_width = (width / ((self.num_white_keys + 1) as f32)) - 2.;
         self.black_piano_key_height = 130.;
         self.black_piano_key_width = self.white_piano_key_width * 0.5;
+
+        self.midi_render_target = render_target(
+            screen_width() as u32,
+            (screen_height() - self.white_piano_key_height) as u32,
+        );
+        self.midi_target_cam = Camera2D::from_display_rect(Rect::new(
+            0.,
+            0.,
+            screen_width(),
+            screen_height() - self.white_piano_key_height,
+        ));
+        self.midi_target_cam.render_target = Some(self.midi_render_target.clone());
     }
 
     pub fn new(song: song::Song) -> PianoScreen {
@@ -36,6 +50,8 @@ impl PianoScreen {
             white_piano_key_height: 0.,
             black_piano_key_width: 0.,
             black_piano_key_height: 0.,
+            midi_render_target: render_target(screen_width() as u32, screen_height() as u32),
+            midi_target_cam: Camera2D::from_display_rect(Rect::new(0., 0., 100., 100.)),
         };
         ps.recalculate(screen_width(), screen_height());
         ps
@@ -77,19 +93,7 @@ impl PianoScreen {
     }
 
     fn draw_song_timeline(&self) {
-        let midi_render_target = render_target(
-            screen_width() as u32,
-            (screen_height() - self.white_piano_key_height) as u32,
-        );
-        let mut midi_target_cam = Camera2D::from_display_rect(Rect::new(
-            0.,
-            0.,
-            screen_width(),
-            screen_height() - self.white_piano_key_height,
-        ));
-        midi_target_cam.render_target = Some(midi_render_target.clone());
-
-        set_camera(&midi_target_cam);
+        set_camera(&self.midi_target_cam);
         clear_background(BLACK);
 
         let c1_offset = (self.white_piano_key_width + 2.) * 2. + 1.;
@@ -169,7 +173,7 @@ impl PianoScreen {
         set_default_camera();
 
         draw_texture_ex(
-            &midi_render_target.texture,
+            &self.midi_render_target.texture,
             0.,
             0.,
             WHITE,

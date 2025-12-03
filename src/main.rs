@@ -75,5 +75,7 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
         next_frame().await
     }
 
+    scene::clear();
+
     Ok(())
 }
