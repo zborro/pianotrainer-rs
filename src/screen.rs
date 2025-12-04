@@ -94,6 +94,44 @@ impl PianoScreen {
         }
     }
 
+    fn get_note_block_color(&self, channel_number: u32, sharp: bool) -> Color {
+        match sharp {
+            true => match channel_number {
+                0 => GREEN,
+                1 => BLUE,
+                2 => PURPLE,
+                3 => YELLOW,
+                _ => GRAY,
+            },
+            false => match channel_number {
+                0 => DARKGREEN,
+                1 => DARKBLUE,
+                2 => DARKPURPLE,
+                3 => ORANGE,
+                _ => GRAY,
+            },
+        }
+    }
+
+    fn calc_note_offset(&self, block: &song::NoteBlock) -> f32 {
+        (self.white_piano_key_width + 3.)
+            * match block.key.byte() % 12 {
+                0 => 0.,    // C
+                1 => 0.75,  // C#
+                2 => 1.,    // D
+                3 => 1.75,  // D#
+                4 => 2.,    // E
+                5 => 3.,    // F
+                6 => 3.75,  // F#
+                7 => 4.,    // G
+                8 => 4.75,  // G#
+                9 => 5.,    // A
+                10 => 5.75, // A#
+                11 => 6.,   // B
+                _ => 0.,
+            }
+    }
+
     fn draw_song_timeline(&self) {
         set_camera(&self.midi_target_cam);
         clear_background(BLACK);
@@ -115,23 +153,7 @@ impl PianoScreen {
         for (channel_number, channel_obj) in &self.song.channels {
             for itm in channel_obj.note_blocks.iter() {
                 let octave_offset = (itm.octave.value() - 1) as f32 * octave_w;
-
-                let note_offset = (self.white_piano_key_width + 3.)
-                    * match itm.key.byte() % 12 {
-                        0 => 0.,    // C
-                        1 => 0.75,  // C#
-                        2 => 1.,    // D
-                        3 => 1.75,  // D#
-                        4 => 2.,    // E
-                        5 => 3.,    // F
-                        6 => 3.75,  // F#
-                        7 => 4.,    // G
-                        8 => 4.75,  // G#
-                        9 => 5.,    // A
-                        10 => 5.75, // A#
-                        11 => 6.,   // B
-                        _ => 0.,
-                    };
+                let note_offset = self.calc_note_offset(itm);
 
                 let block_x = c1_offset + octave_offset + note_offset;
                 let block_y = (itm.start_time as f32) / 10.;
@@ -142,33 +164,33 @@ impl PianoScreen {
                 };
                 let block_h = (itm.stop_time.unwrap() - itm.start_time) as f32 / 10.;
 
-                let sharp_color = match channel_number {
-                    0 => GREEN,
-                    1 => BLUE,
-                    2 => PURPLE,
-                    3 => YELLOW,
-                    _ => GRAY,
-                };
-
-                let flat_color = match channel_number {
-                    0 => DARKGREEN,
-                    1 => DARKBLUE,
-                    2 => DARKPURPLE,
-                    3 => ORANGE,
-                    _ => GRAY,
-                };
-
                 draw_rectangle(
                     block_x,
                     block_y - self.time_offset_y,
                     block_w,
                     block_h,
-                    if itm.note.is_flat() {
-                        flat_color
-                    } else {
-                        sharp_color
-                    },
+                    self.get_note_block_color(*channel_number, !itm.note.is_flat()),
                 );
+            }
+        }
+
+        let ordered_block_groups = &self.song.get_note_blocks_ordered();
+
+        for chunk in ordered_block_groups {
+            for block in chunk {
+                let octave_offset = (block.octave.value() - 1) as f32 * octave_w;
+                let note_offset = self.calc_note_offset(block);
+
+                let line_y = (block.start_time as f32) / 10.;
+                let line_xo = if block.key.is_sharp() {
+                    self.black_piano_key_width / 2.
+                } else {
+                    self.white_piano_key_width / 2.
+                };
+                let line_x = c1_offset + octave_offset + note_offset + line_xo;
+                let line_h = (block.stop_time.unwrap() - block.start_time) as f32 / 10.;
+
+                draw_line(line_x, line_y - self.time_offset_y, line_x, line_y - self.time_offset_y + line_h, 2., RED);
             }
         }
 

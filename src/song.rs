@@ -5,6 +5,7 @@ use std::path::Path;
 
 use midix::prelude::*;
 
+#[derive(Clone)]
 pub struct NoteBlock {
     pub octave: Octave,
     pub note: Note,
@@ -20,6 +21,21 @@ pub struct Channel {
 
 pub struct Song {
     pub channels: HashMap<u32, Channel>,
+}
+
+impl Song {
+    pub fn get_note_blocks_ordered(&self) -> Vec<Vec<NoteBlock>> {
+        let mut results = vec![];
+
+        for ch in self.channels.values() {
+            results.extend(ch.note_blocks.to_vec());
+        }
+
+        results.sort_by(|a, b| a.start_time.partial_cmp(&b.start_time).unwrap());
+
+        let chunk_by = results.chunk_by(|a, b| a.start_time == b.start_time);
+        chunk_by.map(|x| x.to_vec()).collect()
+    }
 }
 
 pub fn load_song(path: &Path) -> Song {
