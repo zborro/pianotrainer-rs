@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{ HashSet, HashMap };
 
 use macroquad::experimental::scene::{Node, RefMut};
 use macroquad::prelude::*;
@@ -18,6 +18,7 @@ pub struct PianoScreen {
     black_piano_key_height: f32,
     midi_render_target: RenderTarget,
     midi_target_cam: Camera2D,
+    foo: HashMap<String, Texture2D>,
 }
 
 impl PianoScreen {
@@ -42,7 +43,7 @@ impl PianoScreen {
 
     pub fn new(song: song::Song) -> PianoScreen {
         let mut ps = PianoScreen {
-            song: song,
+            song,
             play: false,
             time_offset: 0.,
             time_offset_y: 0.,
@@ -54,6 +55,7 @@ impl PianoScreen {
             black_piano_key_height: 0.,
             midi_render_target: render_target(screen_width() as u32, screen_height() as u32),
             midi_target_cam: Camera2D::from_display_rect(Rect::new(0., 0., 100., 100.)),
+            foo: HashMap::new(),
         };
         ps.recalculate(screen_width(), screen_height());
         ps
@@ -132,7 +134,28 @@ impl PianoScreen {
             }
     }
 
-    fn draw_song_timeline(&self) {
+    fn render_inverse_text(&self, text: &str) -> Texture2D {
+        let text_size = measure_text(text, None, 16, 1.);
+        let text_render_target =
+            render_target((text_size.width) as u32, (text_size.height * 2.) as u32);
+
+        let mut camera =
+            Camera2D::from_display_rect(Rect::new(0., 0., text_size.width, text_size.height * 2.));
+        camera.render_target = Some(text_render_target.clone());
+
+        push_camera_state();
+
+        set_camera(&camera);
+        clear_background(BLACK);
+        draw_text(text, 0., 12., 16., RED);
+
+        set_default_camera();
+        pop_camera_state();
+
+        text_render_target.texture.clone()
+    }
+
+    fn draw_song_timeline(&mut self) {
         set_camera(&self.midi_target_cam);
         clear_background(BLACK);
 
@@ -190,7 +213,30 @@ impl PianoScreen {
                 let line_x = c1_offset + octave_offset + note_offset + line_xo;
                 let line_h = (block.stop_time.unwrap() - block.start_time) as f32 / 10.;
 
-                draw_line(line_x, line_y - self.time_offset_y, line_x, line_y - self.time_offset_y + line_h, 2., RED);
+                draw_line(
+                    line_x,
+                    line_y - self.time_offset_y,
+                    line_x,
+                    line_y - self.time_offset_y + line_h,
+                    2.,
+                    RED,
+                );
+
+                let keytex : String = format!("{}", block.start_time).to_string();
+                if !self.foo.contains_key(&keytex) {
+                    let texttex = self.render_inverse_text(&format!("{}", block.start_time));
+                    self.foo.insert(keytex.to_string(), texttex.clone());
+                }
+                let texttex = self.foo.get(&keytex).unwrap();
+                draw_texture_ex(
+                    texttex,
+                    line_x + 5.,
+                    line_y - self.time_offset_y - 5.,
+                    WHITE,
+                    DrawTextureParams {
+                        ..Default::default()
+                    },
+                );
             }
         }
 
@@ -232,7 +278,7 @@ impl PianoScreen {
 impl Node for PianoScreen {
     fn ready(_node: RefMut<Self>) {}
 
-    fn draw(node: RefMut<Self>) {
+    fn draw(mut node: RefMut<Self>) {
         node.draw_piano_keyboard();
         node.draw_song_timeline();
     }
