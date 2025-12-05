@@ -1,4 +1,4 @@
-use std::collections::{ HashSet, HashMap };
+use std::collections::{HashMap, HashSet};
 
 use macroquad::experimental::scene::{Node, RefMut};
 use macroquad::prelude::*;
@@ -222,12 +222,12 @@ impl PianoScreen {
                     RED,
                 );
 
-                let keytex : String = format!("{}", block.start_time).to_string();
-                if !self.foo.contains_key(&keytex) {
+                let texture_key: String = format!("{}", block.start_time).to_string();
+                if !self.foo.contains_key(&texture_key) {
                     let texttex = self.render_inverse_text(&format!("{}", block.start_time));
-                    self.foo.insert(keytex.to_string(), texttex.clone());
+                    self.foo.insert(texture_key.to_string(), texttex.clone());
                 }
-                let texttex = self.foo.get(&keytex).unwrap();
+                let texttex = self.foo.get(&texture_key).unwrap();
                 draw_texture_ex(
                     texttex,
                     line_x + 5.,
