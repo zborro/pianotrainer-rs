@@ -18,7 +18,8 @@ pub struct PianoScreen {
     black_piano_key_height: f32,
     midi_render_target: RenderTarget,
     midi_target_cam: Camera2D,
-    foo: HashMap<String, Texture2D>,
+    render_debug_extra: bool,
+    text_texture_cache: HashMap<String, Texture2D>,
     pixels_per_second: f32,
 }
 
@@ -56,7 +57,8 @@ impl PianoScreen {
             black_piano_key_height: 0.,
             midi_render_target: render_target(screen_width() as u32, screen_height() as u32),
             midi_target_cam: Camera2D::from_display_rect(Rect::new(0., 0., 100., 100.)),
-            foo: HashMap::new(),
+            render_debug_extra: false,
+            text_texture_cache: HashMap::new(),
             pixels_per_second: 400.,
         };
         ps.recalculate(screen_width(), screen_height());
@@ -175,30 +177,6 @@ impl PianoScreen {
             );
         }
 
-        for (channel_number, channel_obj) in &self.song.channels {
-            for itm in channel_obj.note_blocks.iter() {
-                let octave_offset = (itm.octave.value() - 1) as f32 * octave_w;
-                let note_offset = self.calc_note_offset(itm);
-
-                let block_x = c1_offset + octave_offset + note_offset;
-                let block_y = ((itm.start_time as f32) / 1_000_000.) * self.pixels_per_second;
-                let block_w = if itm.key.is_sharp() {
-                    self.black_piano_key_width
-                } else {
-                    self.white_piano_key_width
-                };
-                let block_h = (((itm.stop_time.unwrap() - itm.start_time) as f32) / 1_000_000.) * self.pixels_per_second;
-
-                draw_rectangle(
-                    block_x,
-                    block_y - self.time_offset_y,
-                    block_w,
-                    block_h,
-                    self.get_note_block_color(*channel_number, !itm.note.is_flat()),
-                );
-            }
-        }
-
         let ordered_block_groups = &self.song.get_note_blocks_ordered();
 
         for chunk in ordered_block_groups {
@@ -206,39 +184,65 @@ impl PianoScreen {
                 let octave_offset = (block.octave.value() - 1) as f32 * octave_w;
                 let note_offset = self.calc_note_offset(block);
 
-                let line_y = ((block.start_time as f32) / 1_000_000.) * self.pixels_per_second;
-                let line_xo = if block.key.is_sharp() {
-                    self.black_piano_key_width / 2.
+                let block_x = c1_offset + octave_offset + note_offset;
+                let block_y = ((block.start_time as f32) / 1_000_000.) * self.pixels_per_second;
+                let block_w = if block.key.is_sharp() {
+                    self.black_piano_key_width
                 } else {
-                    self.white_piano_key_width / 2.
+                    self.white_piano_key_width
                 };
-                let line_x = c1_offset + octave_offset + note_offset + line_xo;
-                let line_h = ((block.stop_time.unwrap() - block.start_time) as f32 / 1_000_000.) * self.pixels_per_second;
+                let block_h = (((block.stop_time.unwrap() - block.start_time) as f32) / 1_000_000.)
+                    * self.pixels_per_second;
 
-                draw_line(
-                    line_x,
-                    line_y - self.time_offset_y,
-                    line_x,
-                    line_y - self.time_offset_y + line_h,
-                    2.,
-                    RED,
+                draw_rectangle(
+                    block_x,
+                    block_y - self.time_offset_y,
+                    block_w,
+                    block_h,
+                    self.get_note_block_color(block.channel_number, !block.note.is_flat()),
                 );
 
-                let texture_key: String = format!("{}", block.start_delta).to_string();
-                if !self.foo.contains_key(&texture_key) {
-                    let texttex = self.render_inverse_text(&format!("{} / {}ms", block.start_delta, (block.start_time as f64 / 1_000.) as u32));
-                    self.foo.insert(texture_key.to_string(), texttex.clone());
+                if self.render_debug_extra {
+                    let line_y = ((block.start_time as f32) / 1_000_000.) * self.pixels_per_second;
+                    let line_xo = if block.key.is_sharp() {
+                        self.black_piano_key_width / 2.
+                    } else {
+                        self.white_piano_key_width / 2.
+                    };
+                    let line_x = c1_offset + octave_offset + note_offset + line_xo;
+                    let line_h = ((block.stop_time.unwrap() - block.start_time) as f32
+                        / 1_000_000.)
+                        * self.pixels_per_second;
+
+                    draw_line(
+                        line_x,
+                        line_y - self.time_offset_y,
+                        line_x,
+                        line_y - self.time_offset_y + line_h,
+                        2.,
+                        RED,
+                    );
+
+                    let texture_key: String = format!("{}", block.start_delta).to_string();
+                    if !self.text_texture_cache.contains_key(&texture_key) {
+                        let texttex = self.render_inverse_text(&format!(
+                            "{} / {}ms",
+                            block.start_delta,
+                            (block.start_time as f64 / 1_000.) as u32
+                        ));
+                        self.text_texture_cache.insert(texture_key.to_string(), texttex.clone());
+                    }
+                    let texttex = self.text_texture_cache.get(&texture_key).unwrap();
+                    draw_texture_ex(
+                        texttex,
+                        line_x + 5.,
+                        line_y - self.time_offset_y - 5.,
+                        WHITE,
+                        DrawTextureParams {
+                            ..Default::default()
+                        },
+                    );
                 }
-                let texttex = self.foo.get(&texture_key).unwrap();
-                draw_texture_ex(
-                    texttex,
-                    line_x + 5.,
-                    line_y - self.time_offset_y - 5.,
-                    WHITE,
-                    DrawTextureParams {
-                        ..Default::default()
-                    },
-                );
             }
         }
 

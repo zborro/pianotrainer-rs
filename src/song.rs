@@ -3,8 +3,8 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-use midix::prelude::*;
 use midix::prelude::MetaMessage::*;
+use midix::prelude::*;
 
 #[derive(Clone)]
 pub struct NoteBlock {
@@ -15,6 +15,7 @@ pub struct NoteBlock {
     pub stop_delta: Option<u32>,
     pub start_time: u32,
     pub stop_time: Option<u32>,
+    pub channel_number: u32,
 }
 
 pub struct Channel {
@@ -74,7 +75,8 @@ pub fn load_song(path: &Path) -> Song {
         match reader.read_event() {
             Err(why) => panic!("failed to process event from midi: {}", why),
             Ok(FileEvent::Header(header)) => {
-                song.ticks_per_quarter_note = header.timing().ticks_per_quarter_note().unwrap_or(48) as u32
+                song.ticks_per_quarter_note =
+                    header.timing().ticks_per_quarter_note().unwrap_or(48) as u32
             }
             Ok(FileEvent::Track(_)) => {}
             Ok(FileEvent::TrackEvent(track_event)) => {
@@ -85,11 +87,12 @@ pub fn load_song(path: &Path) -> Song {
                     TrackMessage::ChannelVoice(cv) => {
                         let channel = cv.channel();
 
-                        let channel_obj = &mut song.channels.entry(channel as u32).or_insert(Channel {
-                            current_delta: 0,
-                            current_time: 0,
-                            note_blocks: vec![],
-                        });
+                        let channel_obj =
+                            &mut song.channels.entry(channel as u32).or_insert(Channel {
+                                current_delta: 0,
+                                current_time: 0,
+                                note_blocks: vec![],
+                            });
                         channel_obj.current_delta += dt;
                         channel_obj.current_time += dt2;
 
@@ -103,6 +106,7 @@ pub fn load_song(path: &Path) -> Song {
                                     stop_delta: None,
                                     start_time: channel_obj.current_time,
                                     stop_time: None,
+                                    channel_number: channel as u32,
                                 });
                                 // NoteOn w/ velocity=0 is NoteOff?
                             }
@@ -125,23 +129,21 @@ pub fn load_song(path: &Path) -> Song {
                         }
                     }
                     TrackMessage::SystemExclusive(_) => {}
-                    TrackMessage::Meta(meta_event) => {
-                        match meta_event {
-                            Tempo(tempo_event) => {
-                                song.cur_us_per_quarter_note = tempo_event.micros_per_quarter_note();
-                            }
-                            TimeSignature(time_signature_event) => {
-                                println!(
-                                    "Time signature = num={} den={} cpc={} 32s={}",
-                                    time_signature_event.num(),
-                                    time_signature_event.den(),
-                                    time_signature_event.clocks_per_click(),
-                                    time_signature_event.notated_32nds_per_24_clocks()
-                                );
-                            }
-                            _ => (),
+                    TrackMessage::Meta(meta_event) => match meta_event {
+                        Tempo(tempo_event) => {
+                            song.cur_us_per_quarter_note = tempo_event.micros_per_quarter_note();
                         }
-                    }
+                        TimeSignature(time_signature_event) => {
+                            println!(
+                                "Time signature = num={} den={} cpc={} 32s={}",
+                                time_signature_event.num(),
+                                time_signature_event.den(),
+                                time_signature_event.clocks_per_click(),
+                                time_signature_event.notated_32nds_per_24_clocks()
+                            );
+                        }
+                        _ => (),
+                    },
                 }
             }
             Ok(FileEvent::EOF) => break,
