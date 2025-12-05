@@ -4,6 +4,7 @@ use std::io::prelude::*;
 use std::path::Path;
 
 use midix::prelude::*;
+use midix::prelude::MetaMessage::*;
 
 #[derive(Clone)]
 pub struct NoteBlock {
@@ -108,7 +109,23 @@ pub fn load_song(path: &Path) -> Song {
                         }
                     }
                     TrackMessage::SystemExclusive(_) => {}
-                    TrackMessage::Meta(_) => {}
+                    TrackMessage::Meta(meta_event) => {
+                        match meta_event {
+                            Tempo(tempo_event) => {
+                                println!("Tempo = us-per-q-note={}", tempo_event.micros_per_quarter_note());
+                            }
+                            TimeSignature(time_signature_event) => {
+                                println!(
+                                    "Time signature = num={} den={} cpc={} 32s={}",
+                                    time_signature_event.num(),
+                                    time_signature_event.den(),
+                                    time_signature_event.clocks_per_click(),
+                                    time_signature_event.notated_32nds_per_24_clocks()
+                                );
+                            }
+                            _ => (),
+                        }
+                    }
                 }
             }
             Ok(FileEvent::EOF) => break,
