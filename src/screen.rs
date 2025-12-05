@@ -19,6 +19,7 @@ pub struct PianoScreen {
     midi_render_target: RenderTarget,
     midi_target_cam: Camera2D,
     foo: HashMap<String, Texture2D>,
+    pixels_per_second: f32,
 }
 
 impl PianoScreen {
@@ -56,6 +57,7 @@ impl PianoScreen {
             midi_render_target: render_target(screen_width() as u32, screen_height() as u32),
             midi_target_cam: Camera2D::from_display_rect(Rect::new(0., 0., 100., 100.)),
             foo: HashMap::new(),
+            pixels_per_second: 400.,
         };
         ps.recalculate(screen_width(), screen_height());
         ps
@@ -179,13 +181,13 @@ impl PianoScreen {
                 let note_offset = self.calc_note_offset(itm);
 
                 let block_x = c1_offset + octave_offset + note_offset;
-                let block_y = (itm.start_delta as f32) / 10.;
+                let block_y = ((itm.start_time as f32) / 1_000_000.) * self.pixels_per_second;
                 let block_w = if itm.key.is_sharp() {
                     self.black_piano_key_width
                 } else {
                     self.white_piano_key_width
                 };
-                let block_h = (itm.stop_delta.unwrap() - itm.start_delta) as f32 / 10.;
+                let block_h = (((itm.stop_time.unwrap() - itm.start_time) as f32) / 1_000_000.) * self.pixels_per_second;
 
                 draw_rectangle(
                     block_x,
@@ -204,14 +206,14 @@ impl PianoScreen {
                 let octave_offset = (block.octave.value() - 1) as f32 * octave_w;
                 let note_offset = self.calc_note_offset(block);
 
-                let line_y = ((block.start_time as f32) / 1_000_000.) * 250.;
+                let line_y = ((block.start_time as f32) / 1_000_000.) * self.pixels_per_second;
                 let line_xo = if block.key.is_sharp() {
                     self.black_piano_key_width / 2.
                 } else {
                     self.white_piano_key_width / 2.
                 };
                 let line_x = c1_offset + octave_offset + note_offset + line_xo;
-                let line_h = ((block.stop_time.unwrap() - block.start_time) as f32 / 1_000_000.) * 250.;
+                let line_h = ((block.stop_time.unwrap() - block.start_time) as f32 / 1_000_000.) * self.pixels_per_second;
 
                 draw_line(
                     line_x,
@@ -266,7 +268,7 @@ impl PianoScreen {
     pub fn update(&mut self, frame_time: f32) {
         if self.play {
             self.time_offset += frame_time;
-            self.time_offset_y += frame_time * 250.;
+            self.time_offset_y += frame_time * self.pixels_per_second;
         }
     }
 
