@@ -11,16 +11,21 @@ pub struct NoteBlock {
     pub octave: Octave,
     pub note: Note,
     pub key: Key,
+    pub start_delta: u32,
+    pub stop_delta: Option<u32>,
     pub start_time: u32,
     pub stop_time: Option<u32>,
 }
 
 pub struct Channel {
-    curtime: u32,
+    current_delta: u32,
+    current_time: u32,
     pub note_blocks: Vec<NoteBlock>,
 }
 
 pub struct Song {
+    pub cur_us_per_quarter_note: u32,
+    pub ticks_per_quarter_note: u32,
     pub channels: HashMap<u32, Channel>,
 }
 
@@ -32,10 +37,14 @@ impl Song {
             results.extend(ch.note_blocks.to_vec());
         }
 
-        results.sort_by(|a, b| a.start_time.partial_cmp(&b.start_time).unwrap());
+        results.sort_by(|a, b| a.start_delta.partial_cmp(&b.start_delta).unwrap());
 
-        let chunk_by = results.chunk_by(|a, b| a.start_time == b.start_time);
+        let chunk_by = results.chunk_by(|a, b| a.start_delta == b.start_delta);
         chunk_by.map(|x| x.to_vec()).collect()
+    }
+
+    pub fn us_per_tick(&self) -> u32 {
+        (self.cur_us_per_quarter_note as f32 / self.ticks_per_quarter_note as f32) as u32
     }
 }
 
@@ -48,6 +57,8 @@ pub fn load_song(path: &Path) -> Song {
     };
 
     let mut song: Song = Song {
+        cur_us_per_quarter_note: meta::Tempo::default().micros_per_quarter_note(),
+        ticks_per_quarter_note: 48,
         channels: HashMap::new(),
     };
 
@@ -59,27 +70,28 @@ pub fn load_song(path: &Path) -> Song {
 
     let mut reader = Reader::from_byte_slice(&buf);
 
-    let mut _header: Option<RawHeaderChunk> = None;
-
     loop {
         match reader.read_event() {
             Err(why) => panic!("failed to process event from midi: {}", why),
-            Ok(FileEvent::Header(hdr)) => {
-                _header = Some(hdr);
+            Ok(FileEvent::Header(header)) => {
+                song.ticks_per_quarter_note = header.timing().ticks_per_quarter_note().unwrap_or(48) as u32
             }
             Ok(FileEvent::Track(_)) => {}
             Ok(FileEvent::TrackEvent(track_event)) => {
                 let dt = track_event.delta_ticks();
+                let dt2 = dt * song.us_per_tick();
 
                 match track_event.event() {
                     TrackMessage::ChannelVoice(cv) => {
                         let channel = cv.channel();
 
-                        let channel_obj = song.channels.entry(channel as u32).or_insert(Channel {
-                            curtime: 0,
+                        let channel_obj = &mut song.channels.entry(channel as u32).or_insert(Channel {
+                            current_delta: 0,
+                            current_time: 0,
                             note_blocks: vec![],
                         });
-                        channel_obj.curtime += dt;
+                        channel_obj.current_delta += dt;
+                        channel_obj.current_time += dt2;
 
                         match cv.event() {
                             VoiceEvent::NoteOn { key, .. } => {
@@ -87,17 +99,21 @@ pub fn load_song(path: &Path) -> Song {
                                     octave: key.octave(),
                                     note: key.note(),
                                     key: key.clone(),
-                                    start_time: channel_obj.curtime,
+                                    start_delta: channel_obj.current_delta,
+                                    stop_delta: None,
+                                    start_time: channel_obj.current_time,
                                     stop_time: None,
                                 });
+                                // NoteOn w/ velocity=0 is NoteOff?
                             }
                             VoiceEvent::NoteOff { key, .. } => {
                                 for block in channel_obj.note_blocks.iter_mut().rev() {
-                                    if block.stop_time.is_none()
+                                    if block.stop_delta.is_none()
                                         && block.octave == key.octave()
                                         && block.note == key.note()
                                     {
-                                        block.stop_time = Some(channel_obj.curtime);
+                                        block.stop_delta = Some(channel_obj.current_delta);
+                                        block.stop_time = Some(channel_obj.current_time);
                                     }
                                 }
                             }
@@ -112,7 +128,7 @@ pub fn load_song(path: &Path) -> Song {
                     TrackMessage::Meta(meta_event) => {
                         match meta_event {
                             Tempo(tempo_event) => {
-                                println!("Tempo = us-per-q-note={}", tempo_event.micros_per_quarter_note());
+                                song.cur_us_per_quarter_note = tempo_event.micros_per_quarter_note();
                             }
                             TimeSignature(time_signature_event) => {
                                 println!(

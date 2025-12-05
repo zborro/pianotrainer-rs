@@ -179,13 +179,13 @@ impl PianoScreen {
                 let note_offset = self.calc_note_offset(itm);
 
                 let block_x = c1_offset + octave_offset + note_offset;
-                let block_y = (itm.start_time as f32) / 10.;
+                let block_y = (itm.start_delta as f32) / 10.;
                 let block_w = if itm.key.is_sharp() {
                     self.black_piano_key_width
                 } else {
                     self.white_piano_key_width
                 };
-                let block_h = (itm.stop_time.unwrap() - itm.start_time) as f32 / 10.;
+                let block_h = (itm.stop_delta.unwrap() - itm.start_delta) as f32 / 10.;
 
                 draw_rectangle(
                     block_x,
@@ -204,14 +204,14 @@ impl PianoScreen {
                 let octave_offset = (block.octave.value() - 1) as f32 * octave_w;
                 let note_offset = self.calc_note_offset(block);
 
-                let line_y = (block.start_time as f32) / 10.;
+                let line_y = ((block.start_time as f32) / 1_000_000.) * 250.;
                 let line_xo = if block.key.is_sharp() {
                     self.black_piano_key_width / 2.
                 } else {
                     self.white_piano_key_width / 2.
                 };
                 let line_x = c1_offset + octave_offset + note_offset + line_xo;
-                let line_h = (block.stop_time.unwrap() - block.start_time) as f32 / 10.;
+                let line_h = ((block.stop_time.unwrap() - block.start_time) as f32 / 1_000_000.) * 250.;
 
                 draw_line(
                     line_x,
@@ -222,9 +222,9 @@ impl PianoScreen {
                     RED,
                 );
 
-                let texture_key: String = format!("{}", block.start_time).to_string();
+                let texture_key: String = format!("{}", block.start_delta).to_string();
                 if !self.foo.contains_key(&texture_key) {
-                    let texttex = self.render_inverse_text(&format!("{}", block.start_time));
+                    let texttex = self.render_inverse_text(&format!("{} / {}ms", block.start_delta, (block.start_time as f64 / 1_000.) as u32));
                     self.foo.insert(texture_key.to_string(), texttex.clone());
                 }
                 let texttex = self.foo.get(&texture_key).unwrap();
@@ -266,7 +266,7 @@ impl PianoScreen {
     pub fn update(&mut self, frame_time: f32) {
         if self.play {
             self.time_offset += frame_time;
-            self.time_offset_y += frame_time * 200.;
+            self.time_offset_y += frame_time * 250.;
         }
     }
 
