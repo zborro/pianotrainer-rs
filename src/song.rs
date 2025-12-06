@@ -30,8 +30,47 @@ pub struct Song {
     pub channels: HashMap<u32, Channel>,
 }
 
+pub struct SongIterator {
+    note_blocks: Vec<Vec<NoteBlock>>,
+}
+
+impl SongIterator {
+    fn should_include(&self, from_time: u32, to_time: u32, group: &Vec<NoteBlock>) -> bool {
+        let mut result = false;
+        for block in group {
+            if (block.start_time > from_time && block.start_time < to_time)
+                || (block.stop_time.unwrap_or(0) > from_time
+                    && block.stop_time.unwrap_or(0) < to_time)
+                || (block.start_time < from_time && block.stop_time.unwrap_or(0) > to_time)
+            {
+                result = true;
+            }
+        }
+
+        result
+    }
+
+    pub fn range(&self, from_time: u32, to_time: u32) -> &[Vec<NoteBlock>] {
+        let mut from_ix = self.note_blocks.len();
+        let mut to_ix = 0;
+
+        for (ix, group) in self.note_blocks.iter().enumerate() {
+            if self.should_include(from_time, to_time, group) {
+                if ix < from_ix {
+                    from_ix = ix;
+                }
+                if ix > to_ix {
+                    to_ix = ix;
+                }
+            }
+        }
+
+        &self.note_blocks[from_ix..to_ix]
+    }
+}
+
 impl Song {
-    pub fn get_note_blocks_ordered(&self) -> Vec<Vec<NoteBlock>> {
+    fn get_note_blocks_ordered(&self) -> Vec<Vec<NoteBlock>> {
         let mut results = vec![];
 
         for ch in self.channels.values() {
@@ -42,6 +81,12 @@ impl Song {
 
         let chunk_by = results.chunk_by(|a, b| a.start_delta == b.start_delta);
         chunk_by.map(|x| x.to_vec()).collect()
+    }
+
+    pub fn get_iterator(&self) -> SongIterator {
+        SongIterator {
+            note_blocks: self.get_note_blocks_ordered(),
+        }
     }
 
     pub fn us_per_tick(&self) -> u32 {

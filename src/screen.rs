@@ -177,9 +177,13 @@ impl PianoScreen {
             );
         }
 
-        let ordered_block_groups = &self.song.get_note_blocks_ordered();
+        let song_iter = &self.song.get_iterator();
 
-        for chunk in ordered_block_groups {
+        let from_time = self.time_offset as u32 * 1_000_000;
+        let to_time =
+            from_time + (((screen_height() / self.pixels_per_second) * 1_000_000.) * 1.5) as u32;
+
+        for chunk in song_iter.range(from_time, to_time) {
             for block in chunk {
                 let octave_offset = (block.octave.value() - 1) as f32 * octave_w;
                 let note_offset = self.calc_note_offset(block);
@@ -230,7 +234,8 @@ impl PianoScreen {
                             block.start_delta,
                             (block.start_time as f64 / 1_000.) as u32
                         ));
-                        self.text_texture_cache.insert(texture_key.to_string(), texttex.clone());
+                        self.text_texture_cache
+                            .insert(texture_key.to_string(), texttex.clone());
                     }
                     let texttex = self.text_texture_cache.get(&texture_key).unwrap();
                     draw_texture_ex(
