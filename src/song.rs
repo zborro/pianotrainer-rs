@@ -70,7 +70,7 @@ impl SongIterator {
 }
 
 impl Song {
-    fn get_note_blocks_ordered(&self) -> Vec<Vec<NoteBlock>> {
+    pub fn get_note_blocks_ordered(&self) -> Vec<Vec<NoteBlock>> {
         let mut results = vec![];
 
         for ch in self.channels.values() {
@@ -80,7 +80,7 @@ impl Song {
         results.sort_by(|a, b| a.start_delta.partial_cmp(&b.start_delta).unwrap());
 
         let chunk_by = results.chunk_by(|a, b| a.start_delta == b.start_delta);
-        chunk_by.map(|x| x.to_vec()).collect()
+        chunk_by.map(|x| x.to_vec()).filter(|v| v.len() > 0).collect()
     }
 
     pub fn get_iterator(&self) -> SongIterator {

@@ -21,6 +21,8 @@ pub struct PianoScreen {
     render_debug_extra: bool,
     text_texture_cache: HashMap<String, Texture2D>,
     pixels_per_second: f32,
+    paused_on_block_group: u32,
+    awaiting_piano_input : bool,
 }
 
 impl PianoScreen {
@@ -60,6 +62,8 @@ impl PianoScreen {
             render_debug_extra: false,
             text_texture_cache: HashMap::new(),
             pixels_per_second: 400.,
+            paused_on_block_group: 0,
+            awaiting_piano_input : false,
         };
         ps.recalculate(screen_width(), screen_height());
         ps
@@ -275,14 +279,24 @@ impl PianoScreen {
     }
 
     pub fn update(&mut self, frame_time: f32) {
-        if self.play {
+        let note_block_groups = self.song.get_note_blocks_ordered();
+        let next_group_start_time = note_block_groups.get(self.paused_on_block_group as usize).unwrap().get(0).unwrap().start_time;
+
+        if (self.time_offset * 1_000_000.) as u32 >= next_group_start_time {
+            self.awaiting_piano_input = true;
+        }
+
+        if self.play && !self.awaiting_piano_input {
             self.time_offset += frame_time;
             self.time_offset_y += frame_time * self.pixels_per_second;
         }
     }
 
     pub fn on_piano_key(&mut self, key: u32) {
-        println!("piano key event! {}", key);
+        if self.awaiting_piano_input {
+            self.awaiting_piano_input = false;
+            self.paused_on_block_group += 1;
+        }
     }
 }
 

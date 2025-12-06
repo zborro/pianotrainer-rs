@@ -59,6 +59,9 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
         if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::Escape) {
             break;
         }
+        if is_key_pressed(KeyCode::C) {
+            scene::get_node(piano_screen_handle).on_piano_key(44);
+        }
 
         if screen_width() != last_screen_width {
             scene::get_node(piano_screen_handle).on_screen_resize();
