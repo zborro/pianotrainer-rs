@@ -301,12 +301,14 @@ impl PianoScreen {
         }
     }
 
-    pub fn on_piano_key(&mut self, _key: Key) {
+    pub fn on_piano_key_down(&mut self, _key: Key) {
         if self.awaiting_piano_input {
             self.awaiting_piano_input = false;
             self.paused_on_block_group += 1;
         }
     }
+
+    pub fn on_piano_key_up(&mut self, _key: Key) {}
 }
 
 impl Node for PianoScreen {

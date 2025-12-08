@@ -48,20 +48,25 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
         "midir-read-input",
         move |stamp, message, _| {
             println!("{}: {:?} (len = {})", stamp, message, message.len());
-            let parsed = LiveEvent::from_bytes(message).unwrap();
-            if let LiveEvent::ChannelVoice(cv) = parsed {
-                let event = cv.event();
-                if let VoiceEvent::NoteOn { key, .. } = event {
-                    println!("detected live noteOn: {}/{}", key.octave(), key.note());
-                    loop {
-                        let node = scene::try_get_node(piano_screen_handle);
-                        if let Some(mut node) = node {
-                            node.on_piano_key(key.clone());
-                            break;
-                        } else {
-                            thread::sleep(std::time::Duration::from_millis(1));
+
+            loop {
+                let node = scene::try_get_node(piano_screen_handle);
+                if let Some(mut node) = node {
+                    let parsed = LiveEvent::from_bytes(message).unwrap();
+                    if let LiveEvent::ChannelVoice(cv) = parsed {
+                        let event = cv.event();
+                        if let VoiceEvent::NoteOn { key, .. } = event {
+                            println!("detected live noteOn: {}/{}", key.octave(), key.note());
+                            node.on_piano_key_down(*key);
+                        } else if let VoiceEvent::NoteOff { key, .. } = event {
+                            println!("detected live noteOff: {}/{}", key.octave(), key.note());
+                            node.on_piano_key_up(*key);
                         }
                     }
+
+                    break;
+                } else {
+                    thread::sleep(std::time::Duration::from_millis(1));
                 }
             }
         },
@@ -72,13 +77,25 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
         Camera2D::from_display_rect(Rect::new(0., 0., screen_width(), screen_height()));
     scene::set_camera(0, Some(camera));
 
+    let fake_key = Key::new(Note::C, Octave::new(1));
+    let mut fake_piano_key_down = 0;
+
     loop {
         if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::Escape) {
             break;
         }
+
+        if fake_piano_key_down > 0 {
+            fake_piano_key_down += 1;
+        }
+        if fake_piano_key_down >= 100 {
+            scene::get_node(piano_screen_handle).on_piano_key_up(fake_key);
+            fake_piano_key_down = 0;
+        }
+
         if is_key_pressed(KeyCode::C) {
-            let fake_key = Key::new(Note::C, Octave::new(1));
-            scene::get_node(piano_screen_handle).on_piano_key(fake_key);
+            scene::get_node(piano_screen_handle).on_piano_key_down(fake_key);
+            fake_piano_key_down = 1;
         }
 
         if screen_width() != last_screen_width {
