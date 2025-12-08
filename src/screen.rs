@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 
 use macroquad::experimental::scene::{Node, RefMut};
 use macroquad::prelude::*;
@@ -24,6 +25,7 @@ pub struct PianoScreen {
     pixels_per_second: f32,
     paused_on_block_group: u32,
     awaiting_piano_input: bool,
+    active_piano_keys: HashSet<Key>,
 }
 
 impl PianoScreen {
@@ -65,6 +67,7 @@ impl PianoScreen {
             pixels_per_second: 400.,
             paused_on_block_group: 0,
             awaiting_piano_input: false,
+            active_piano_keys: HashSet::new(),
         };
         ps.recalculate(screen_width(), screen_height());
         ps
@@ -272,7 +275,14 @@ impl PianoScreen {
             },
         );
 
-        draw_text(&format!("t: {}s", self.time_offset), 10., 40., 32., RED);
+        draw_text(&format!("T: {}s", self.time_offset), 10., 40., 32., RED);
+        draw_text(
+            &format!("#pkd: {}", self.active_piano_keys.len()),
+            10.,
+            70.,
+            32.,
+            RED,
+        );
     }
 
     pub fn toggle_play(&mut self) {
@@ -301,14 +311,17 @@ impl PianoScreen {
         }
     }
 
-    pub fn on_piano_key_down(&mut self, _key: Key) {
+    pub fn on_piano_key_down(&mut self, key: Key) {
+        self.active_piano_keys.insert(key);
         if self.awaiting_piano_input {
             self.awaiting_piano_input = false;
             self.paused_on_block_group += 1;
         }
     }
 
-    pub fn on_piano_key_up(&mut self, _key: Key) {}
+    pub fn on_piano_key_up(&mut self, key: Key) {
+        self.active_piano_keys.remove(&key);
+    }
 }
 
 impl Node for PianoScreen {

@@ -88,7 +88,7 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
         if fake_piano_key_down > 0 {
             fake_piano_key_down += 1;
         }
-        if fake_piano_key_down >= 100 {
+        if fake_piano_key_down >= 25 {
             scene::get_node(piano_screen_handle).on_piano_key_up(fake_key);
             fake_piano_key_down = 0;
         }
