@@ -1,10 +1,10 @@
 use clap::Parser;
 use macroquad::prelude::*;
 use midir::{Ignore, MidiInput};
+use midix::prelude::{FromLiveEventBytes, Key, LiveEvent, Note, Octave, VoiceEvent};
 use std::error::Error;
 use std::path::PathBuf;
 use std::thread;
-use core::time;
 
 mod screen;
 mod song;
@@ -48,14 +48,20 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
         "midir-read-input",
         move |stamp, message, _| {
             println!("{}: {:?} (len = {})", stamp, message, message.len());
-            loop {
-                let node = scene::try_get_node(piano_screen_handle);
-                if node.is_some() {
-                    node.unwrap().on_piano_key(123);
-                    break;
-                }
-                else {
-                    thread::sleep(std::time::Duration::from_millis(1));
+            let parsed = LiveEvent::from_bytes(message).unwrap();
+            if let LiveEvent::ChannelVoice(cv) = parsed {
+                let event = cv.event();
+                if let VoiceEvent::NoteOn { key, .. } = event {
+                    println!("detected live noteOn: {}/{}", key.octave(), key.note());
+                    loop {
+                        let node = scene::try_get_node(piano_screen_handle);
+                        if let Some(mut node) = node {
+                            node.on_piano_key(key.clone());
+                            break;
+                        } else {
+                            thread::sleep(std::time::Duration::from_millis(1));
+                        }
+                    }
                 }
             }
         },
@@ -71,7 +77,8 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
             break;
         }
         if is_key_pressed(KeyCode::C) {
-            scene::get_node(piano_screen_handle).on_piano_key(44);
+            let fake_key = Key::new(Note::C, Octave::new(1));
+            scene::get_node(piano_screen_handle).on_piano_key(fake_key);
         }
 
         if screen_width() != last_screen_width {

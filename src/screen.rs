@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use macroquad::experimental::scene::{Node, RefMut};
 use macroquad::prelude::*;
+use midix::prelude::Key;
 
 use crate::song;
 
@@ -280,15 +281,18 @@ impl PianoScreen {
 
     pub fn update(&mut self, frame_time: f32) {
         let note_block_groups = self.song.get_note_blocks_ordered();
-        let next_group_start_time = note_block_groups
-            .get(self.paused_on_block_group as usize)
-            .unwrap()
-            .get(0)
-            .unwrap()
-            .start_time;
 
-        if (self.time_offset * 1_000_000.) as u32 >= next_group_start_time {
-            self.awaiting_piano_input = true;
+        if (self.paused_on_block_group as usize) < note_block_groups.len() {
+            let next_group_start_time = note_block_groups
+                .get(self.paused_on_block_group as usize)
+                .unwrap()
+                .get(0)
+                .unwrap()
+                .start_time;
+
+            if (self.time_offset * 1_000_000.) as u32 >= next_group_start_time {
+                self.awaiting_piano_input = true;
+            }
         }
 
         if self.play && !self.awaiting_piano_input {
@@ -297,7 +301,7 @@ impl PianoScreen {
         }
     }
 
-    pub fn on_piano_key(&mut self, key: u32) {
+    pub fn on_piano_key(&mut self, _key: Key) {
         if self.awaiting_piano_input {
             self.awaiting_piano_input = false;
             self.paused_on_block_group += 1;
