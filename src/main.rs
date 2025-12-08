@@ -3,6 +3,8 @@ use macroquad::prelude::*;
 use midir::{Ignore, MidiInput};
 use std::error::Error;
 use std::path::PathBuf;
+use std::thread;
+use core::time;
 
 mod screen;
 mod song;
@@ -46,7 +48,16 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
         "midir-read-input",
         move |stamp, message, _| {
             println!("{}: {:?} (len = {})", stamp, message, message.len());
-            scene::get_node(piano_screen_handle).on_piano_key(123);
+            loop {
+                let node = scene::try_get_node(piano_screen_handle);
+                if node.is_some() {
+                    node.unwrap().on_piano_key(123);
+                    break;
+                }
+                else {
+                    thread::sleep(std::time::Duration::from_millis(1));
+                }
+            }
         },
         (),
     )?;
