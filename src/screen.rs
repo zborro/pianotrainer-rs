@@ -86,29 +86,41 @@ impl PianoScreen {
         let octave_w = (self.white_piano_key_width + 3.) * 7.;
 
         for black_u32 in 0..2u32 {
-          let black = black_u32 == 1;
-          for i in 0..num_piano_keys {
-            let key = Key::from_databyte((key_byte_offset + i) as u8).unwrap();
-            if self.is_key_white(key) == black {
-              continue;
+            let black = black_u32 == 1;
+            for i in 0..num_piano_keys {
+                let key = Key::from_databyte((key_byte_offset + i) as u8).unwrap();
+                if self.is_key_white(key) == black {
+                    continue;
+                }
+
+                let octave_offset = (key.octave().value() - 1) as f32 * octave_w;
+                let note_offset = self.calc_note_offset(key);
+                let color = if self.active_piano_keys.contains(&key) {
+                    RED
+                } else {
+                    if black { BLACK } else { WHITE }
+                };
+
+                draw_rectangle(
+                    c1_offset + octave_offset + note_offset,
+                    if black {
+                        self.white_piano_key_height - self.black_piano_key_height
+                    } else {
+                        0.
+                    },
+                    if black {
+                        self.black_piano_key_width
+                    } else {
+                        self.white_piano_key_width
+                    },
+                    if black {
+                        self.black_piano_key_height
+                    } else {
+                        self.white_piano_key_height
+                    },
+                    color,
+                );
             }
-
-            let octave_offset = (key.octave().value() - 1) as f32 * octave_w;
-            let note_offset = self.calc_note_offset(key);
-            let color = if self.active_piano_keys.contains(&key) {
-                RED
-            } else {
-                if black { BLACK } else { WHITE }
-            };
-
-            draw_rectangle(
-                c1_offset + octave_offset + note_offset,
-                if black { self.white_piano_key_height - self.black_piano_key_height } else { 0. },
-                if black { self.black_piano_key_width } else { self.white_piano_key_width },
-                if black { self.black_piano_key_height } else { self.white_piano_key_height },
-                color,
-            );
-          }
         }
     }
 
@@ -132,10 +144,10 @@ impl PianoScreen {
     }
 
     fn is_key_white(&self, key: Key) -> bool {
-      match key.byte() % 12 {
-        0 | 2 | 4 | 5 | 7 | 9 | 11 => true,
-        _ => false,
-      }
+        match key.byte() % 12 {
+            0 | 2 | 4 | 5 | 7 | 9 | 11 => true,
+            _ => false,
+        }
     }
 
     fn calc_note_offset(&self, key: Key) -> f32 {
