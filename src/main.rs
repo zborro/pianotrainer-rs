@@ -84,6 +84,18 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
         if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::Escape) {
             break;
         }
+        let is_shift_key_down = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+
+        if is_key_pressed(KeyCode::Minus) {
+            scene::get_node(piano_screen_handle).zoom_out();
+        }
+        if is_key_pressed(KeyCode::Key0) {
+            scene::get_node(piano_screen_handle).zoom_default();
+        }
+        if is_key_pressed(KeyCode::Equal) && is_shift_key_down {
+            scene::get_node(piano_screen_handle).zoom_in();
+        }
+
 
         if fake_piano_key_down > 0 {
             fake_piano_key_down += 1;

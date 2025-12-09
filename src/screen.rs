@@ -62,6 +62,7 @@ pub struct PianoScreen {
     render_debug_extra: bool,
     text_texture_cache: HashMap<String, Texture2D>,
     pixels_per_second: f32,
+    default_pixels_per_second: f32,
     paused_on_block_group: u32,
     awaiting_piano_input: bool,
     awaiting_keys: Option<HashSet<Key>>,
@@ -106,6 +107,7 @@ impl PianoScreen {
             render_debug_extra: false,
             text_texture_cache: HashMap::new(),
             pixels_per_second: 400.,
+            default_pixels_per_second: 400.,
             paused_on_block_group: 0,
             awaiting_piano_input: false,
             awaiting_keys: None,
@@ -400,6 +402,18 @@ impl PianoScreen {
 
     pub fn on_piano_key_up(&mut self, key: Key) {
         self.active_piano_keys.remove(&key);
+    }
+
+    pub fn zoom_out(&mut self) {
+        self.pixels_per_second -= 10.;
+    }
+
+    pub fn zoom_in(&mut self) {
+        self.pixels_per_second += 10.;
+    }
+
+    pub fn zoom_default(&mut self) {
+        self.pixels_per_second = self.default_pixels_per_second;
     }
 }
 
