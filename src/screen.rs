@@ -50,8 +50,15 @@ impl ActiveKeysHistory {
     }
 }
 
+#[derive(Eq, PartialEq)]
+pub enum GameMode {
+  Play,
+  LearnBlocking,
+}
+
 pub struct PianoScreen {
     song: song::Song,
+    mode: GameMode,
     play: bool,
     time_offset: f32,
     time_offset_y: f32,
@@ -97,6 +104,7 @@ impl PianoScreen {
     pub fn new(song: song::Song) -> PianoScreen {
         let mut ps = PianoScreen {
             song,
+            mode: GameMode::Play,
             play: false,
             time_offset: 0.,
             time_offset_y: 0.,
@@ -363,6 +371,17 @@ impl PianoScreen {
             32.,
             RED,
         );
+
+        draw_text(
+            &format!("mode: {}", match self.mode {
+                GameMode::Play => "play",
+                GameMode::LearnBlocking => "blocking-learn",
+              }),
+            10.,
+            130.,
+            32.,
+            RED,
+        );
     }
 
     pub fn toggle_play(&mut self) {
@@ -387,7 +406,7 @@ impl PianoScreen {
             }
         }
 
-        if self.play && !self.awaiting_piano_input {
+          if self.play && (self.mode == GameMode::Play || (self.mode == GameMode::LearnBlocking && !self.awaiting_piano_input)) {
             self.time_offset += frame_time;
             self.time_offset_y += frame_time * self.pixels_per_second;
         }
@@ -422,6 +441,10 @@ impl PianoScreen {
 
     pub fn zoom_default(&mut self) {
         self.pixels_per_second = self.default_pixels_per_second;
+    }
+
+    pub fn set_mode(&mut self, mode: GameMode) {
+        self.mode = mode;
     }
 }
 

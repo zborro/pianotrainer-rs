@@ -79,8 +79,20 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
 
     let fake_key = Key::new(Note::C, Octave::new(1));
     let mut fake_piano_key_down = 0;
+    let mut mode_selection_mode = false;
 
     loop {
+        if mode_selection_mode {
+          if is_key_pressed(KeyCode::P) {
+            scene::get_node(piano_screen_handle).set_mode(screen::GameMode::Play);
+            mode_selection_mode = false;
+          }
+          if is_key_pressed(KeyCode::B) {
+            scene::get_node(piano_screen_handle).set_mode(screen::GameMode::LearnBlocking);
+            mode_selection_mode = false;
+          }
+        }
+
         if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::Escape) {
             break;
         }
@@ -88,14 +100,15 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
 
         if is_key_pressed(KeyCode::Minus) {
             scene::get_node(piano_screen_handle).zoom_out();
-        }
-        if is_key_pressed(KeyCode::Key0) {
+        } else if is_key_pressed(KeyCode::Key0) {
             scene::get_node(piano_screen_handle).zoom_default();
-        }
-        if is_key_pressed(KeyCode::Equal) && is_shift_key_down {
+        }else if is_key_pressed(KeyCode::Equal) && is_shift_key_down {
             scene::get_node(piano_screen_handle).zoom_in();
         }
 
+        if is_key_pressed(KeyCode::M) {
+          mode_selection_mode = true;
+        }
 
         if fake_piano_key_down > 0 {
             fake_piano_key_down += 1;
