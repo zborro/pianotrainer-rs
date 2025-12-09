@@ -1,10 +1,50 @@
 use std::collections::{HashMap, HashSet};
+use std::time::SystemTime;
 
 use macroquad::experimental::scene::{Node, RefMut};
 use macroquad::prelude::*;
-use midix::prelude::{DataByte, Key};
+use midix::prelude::Key;
 
 use crate::song;
+
+#[derive(Hash, Eq, PartialEq)]
+pub struct KeyWithTimestamp {
+    key: Key,
+    timestamp: SystemTime,
+}
+
+pub struct ActiveKeysHistory {
+    history: HashSet<KeyWithTimestamp>,
+}
+
+impl ActiveKeysHistory {
+    pub fn new() -> Self {
+        Self {
+            history: HashSet::new(),
+        }
+    }
+
+    pub fn insert(&mut self, key: Key) {
+        self.history.insert(KeyWithTimestamp {
+            key,
+            timestamp: SystemTime::now(),
+        });
+    }
+
+    pub fn autoclean(&mut self) {
+        self.history
+            .retain(|e| e.timestamp.elapsed().is_ok_and(|v| v.as_secs() < 2));
+
+    }
+
+    pub fn get(&self) -> HashSet<Key> {
+        self.history.iter().map(|e| e.key).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.get().len()
+    }
+}
 
 pub struct PianoScreen {
     song: song::Song,
@@ -24,7 +64,9 @@ pub struct PianoScreen {
     pixels_per_second: f32,
     paused_on_block_group: u32,
     awaiting_piano_input: bool,
+    awaiting_keys: Option<HashSet<Key>>,
     active_piano_keys: HashSet<Key>,
+    active_piano_keys_history: ActiveKeysHistory,
 }
 
 impl PianoScreen {
@@ -66,7 +108,9 @@ impl PianoScreen {
             pixels_per_second: 400.,
             paused_on_block_group: 0,
             awaiting_piano_input: false,
+            awaiting_keys: None,
             active_piano_keys: HashSet::new(),
+            active_piano_keys_history: ActiveKeysHistory::new(),
         };
         ps.recalculate(screen_width(), screen_height());
         ps
@@ -306,6 +350,13 @@ impl PianoScreen {
             32.,
             RED,
         );
+        draw_text(
+            &format!("#pkdH: {}", self.active_piano_keys_history.len()),
+            10.,
+            100.,
+            32.,
+            RED,
+        );
     }
 
     pub fn toggle_play(&mut self) {
@@ -314,17 +365,19 @@ impl PianoScreen {
 
     pub fn update(&mut self, frame_time: f32) {
         let note_block_groups = self.song.get_note_blocks_ordered();
+        self.active_piano_keys_history.autoclean();
 
         if (self.paused_on_block_group as usize) < note_block_groups.len() {
-            let next_group_start_time = note_block_groups
+            let next_group = note_block_groups
                 .get(self.paused_on_block_group as usize)
-                .unwrap()
-                .get(0)
-                .unwrap()
-                .start_time;
+                .unwrap();
+            let next_group_start_time = next_group.first().unwrap().start_time;
 
+            // todo: make sure that this doesn't get called more than once
             if (self.time_offset * 1_000_000.) as u32 >= next_group_start_time {
                 self.awaiting_piano_input = true;
+                self.awaiting_keys =
+                    Some(next_group.iter().map(|b| b.key).collect::<HashSet<Key>>());
             }
         }
 
@@ -336,9 +389,12 @@ impl PianoScreen {
 
     pub fn on_piano_key_down(&mut self, key: Key) {
         self.active_piano_keys.insert(key);
+        self.active_piano_keys_history.insert(key);
         if self.awaiting_piano_input {
-            self.awaiting_piano_input = false;
-            self.paused_on_block_group += 1;
+            if self.active_piano_keys == self.awaiting_keys.clone().unwrap() {
+                self.awaiting_piano_input = false;
+                self.paused_on_block_group += 1;
+            }
         }
     }
 
