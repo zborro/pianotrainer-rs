@@ -83,14 +83,14 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
 
     loop {
         if mode_selection_mode {
-          if is_key_pressed(KeyCode::P) {
-            scene::get_node(piano_screen_handle).set_mode(screen::GameMode::Play);
-            mode_selection_mode = false;
-          }
-          if is_key_pressed(KeyCode::B) {
-            scene::get_node(piano_screen_handle).set_mode(screen::GameMode::LearnBlocking);
-            mode_selection_mode = false;
-          }
+            if is_key_pressed(KeyCode::P) {
+                scene::get_node(piano_screen_handle).set_mode(screen::GameMode::Play);
+                mode_selection_mode = false;
+            }
+            if is_key_pressed(KeyCode::B) {
+                scene::get_node(piano_screen_handle).set_mode(screen::GameMode::LearnBlocking);
+                mode_selection_mode = false;
+            }
         }
 
         if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::Escape) {
@@ -102,12 +102,12 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
             scene::get_node(piano_screen_handle).zoom_out();
         } else if is_key_pressed(KeyCode::Key0) {
             scene::get_node(piano_screen_handle).zoom_default();
-        }else if is_key_pressed(KeyCode::Equal) && is_shift_key_down {
+        } else if is_key_pressed(KeyCode::Equal) && is_shift_key_down {
             scene::get_node(piano_screen_handle).zoom_in();
         }
 
         if is_key_pressed(KeyCode::M) {
-          mode_selection_mode = true;
+            mode_selection_mode = true;
         }
 
         if fake_piano_key_down > 0 {

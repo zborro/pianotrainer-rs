@@ -34,7 +34,6 @@ impl ActiveKeysHistory {
     pub fn autoclean(&mut self) {
         self.history
             .retain(|e| e.timestamp.elapsed().is_ok_and(|v| v.as_secs() < 2));
-
     }
 
     pub fn clear(&mut self) {
@@ -52,8 +51,8 @@ impl ActiveKeysHistory {
 
 #[derive(Eq, PartialEq)]
 pub enum GameMode {
-  Play,
-  LearnBlocking,
+    Play,
+    LearnBlocking,
 }
 
 pub struct PianoScreen {
@@ -373,10 +372,13 @@ impl PianoScreen {
         );
 
         draw_text(
-            &format!("mode: {}", match self.mode {
-                GameMode::Play => "play",
-                GameMode::LearnBlocking => "blocking-learn",
-              }),
+            &format!(
+                "mode: {}",
+                match self.mode {
+                    GameMode::Play => "play",
+                    GameMode::LearnBlocking => "blocking-learn",
+                }
+            ),
             10.,
             130.,
             32.,
@@ -406,7 +408,10 @@ impl PianoScreen {
             }
         }
 
-          if self.play && (self.mode == GameMode::Play || (self.mode == GameMode::LearnBlocking && !self.awaiting_piano_input)) {
+        if self.play
+            && (self.mode == GameMode::Play
+                || (self.mode == GameMode::LearnBlocking && !self.awaiting_piano_input))
+        {
             self.time_offset += frame_time;
             self.time_offset_y += frame_time * self.pixels_per_second;
         }
