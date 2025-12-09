@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
 
 use macroquad::experimental::scene::{Node, RefMut};
 use macroquad::prelude::*;
-use midix::prelude::Key;
+use midix::prelude::{DataByte, Key};
 
 use crate::song;
 
@@ -80,31 +79,36 @@ impl PianoScreen {
     fn draw_piano_keyboard(&self) {
         clear_background(GRAY);
 
-        let black_key_positions: HashSet<i32> = HashSet::from([
-            0, 2, 3, 5, 6, 7, 9, 10, 12, 13, 14, 16, 17, 19, 20, 21, 23, 24, 26, 27, 28, 30, 31,
-            33, 34, 35, 37, 38, 40, 41, 42, 44, 45, 47, 48, 49,
-        ]);
+        let key_byte_offset = 21;
 
-        for i in 0..(self.num_white_keys as i32) {
-            let x = (i as f32) * (self.white_piano_key_width + self.piano_key_margin)
-                + (i as f32 * self.piano_key_margin * 2.);
-            draw_rectangle(
-                x,
-                0.,
-                self.white_piano_key_width,
-                self.white_piano_key_height,
-                WHITE,
-            );
+        let num_piano_keys = 89;
+        let c1_offset = (self.white_piano_key_width + 2.) * 2. + 1.;
+        let octave_w = (self.white_piano_key_width + 3.) * 7.;
 
-            if black_key_positions.contains(&((i - 1) as i32)) {
-                draw_rectangle(
-                    x - (self.black_piano_key_width / 2.) - 2.,
-                    self.white_piano_key_height - self.black_piano_key_height,
-                    self.black_piano_key_width,
-                    self.black_piano_key_height,
-                    BLACK,
-                );
+        for black_u32 in 0..2u32 {
+          let black = black_u32 == 1;
+          for i in 0..num_piano_keys {
+            let key = Key::from_databyte((key_byte_offset + i) as u8).unwrap();
+            if self.is_key_white(key) == black {
+              continue;
             }
+
+            let octave_offset = (key.octave().value() - 1) as f32 * octave_w;
+            let note_offset = self.calc_note_offset(key);
+            let color = if self.active_piano_keys.contains(&key) {
+                RED
+            } else {
+                if black { BLACK } else { WHITE }
+            };
+
+            draw_rectangle(
+                c1_offset + octave_offset + note_offset,
+                if black { self.white_piano_key_height - self.black_piano_key_height } else { 0. },
+                if black { self.black_piano_key_width } else { self.white_piano_key_width },
+                if black { self.black_piano_key_height } else { self.white_piano_key_height },
+                color,
+            );
+          }
         }
     }
 
@@ -127,9 +131,16 @@ impl PianoScreen {
         }
     }
 
-    fn calc_note_offset(&self, block: &song::NoteBlock) -> f32 {
+    fn is_key_white(&self, key: Key) -> bool {
+      match key.byte() % 12 {
+        0 | 2 | 4 | 5 | 7 | 9 | 11 => true,
+        _ => false,
+      }
+    }
+
+    fn calc_note_offset(&self, key: Key) -> f32 {
         (self.white_piano_key_width + 3.)
-            * match block.key.byte() % 12 {
+            * match key.byte() % 12 {
                 0 => 0.,    // C
                 1 => 0.75,  // C#
                 2 => 1.,    // D
@@ -194,7 +205,7 @@ impl PianoScreen {
         for chunk in song_iter.range(from_time, to_time) {
             for block in chunk {
                 let octave_offset = (block.octave.value() - 1) as f32 * octave_w;
-                let note_offset = self.calc_note_offset(block);
+                let note_offset = self.calc_note_offset(block.key);
 
                 let block_x = c1_offset + octave_offset + note_offset;
                 let block_y = ((block.start_time as f32) / 1_000_000.) * self.pixels_per_second;
