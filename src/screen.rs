@@ -37,6 +37,10 @@ impl ActiveKeysHistory {
 
     }
 
+    pub fn clear(&mut self) {
+        self.history.clear();
+    }
+
     pub fn get(&self) -> HashSet<Key> {
         self.history.iter().map(|e| e.key).collect()
     }
@@ -396,6 +400,10 @@ impl PianoScreen {
             if self.active_piano_keys == self.awaiting_keys.clone().unwrap() {
                 self.awaiting_piano_input = false;
                 self.paused_on_block_group += 1;
+
+                // clear to make sure that successive piano key strokes
+                // won't be polluted with previous ones
+                self.active_piano_keys_history.clear();
             }
         }
     }
