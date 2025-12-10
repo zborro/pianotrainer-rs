@@ -439,7 +439,19 @@ impl PianoScreen {
         );
     }
 
-    pub fn skip_blocks(&mut self, amount: i32) {}
+    pub fn skip_blocks(&mut self, amount: i32) {
+        self.play = false;
+
+        if amount < 0 {
+            println!("not implemented yet!");
+        } else {
+            for _ in 0..amount {
+                self.move_to_next_group();
+            }
+            self.time_offset = self.next_group.first().unwrap().start_time as f32 / 1_000_000.;
+            self.time_offset_y = self.time_offset * self.pixels_per_second;
+        }
+    }
 }
 
 impl Node for PianoScreen {
