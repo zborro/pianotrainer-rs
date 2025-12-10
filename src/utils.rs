@@ -1,8 +1,7 @@
-use std::time::SystemTime;
 use std::collections::HashSet;
+use std::time::SystemTime;
 
 use midix::prelude::Key;
-
 
 #[derive(Hash, Eq, PartialEq)]
 pub struct KeyWithTimestamp {
@@ -45,4 +44,3 @@ impl ActiveKeysHistory {
         self.get().len()
     }
 }
-

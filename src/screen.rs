@@ -11,6 +11,7 @@ use crate::utils;
 pub enum GameMode {
     Play,
     LearnBlocking,
+    Unset,
 }
 
 pub struct PianoScreen {
@@ -31,11 +32,11 @@ pub struct PianoScreen {
     text_texture_cache: HashMap<String, Texture2D>,
     pixels_per_second: f32,
     default_pixels_per_second: f32,
-    paused_on_block_group: u32,
     awaiting_piano_input: bool,
     awaiting_keys: Option<HashSet<Key>>,
     active_piano_keys: HashSet<Key>,
     active_piano_keys_history: utils::ActiveKeysHistory,
+    next_group: Vec<song::NoteBlock>,
 }
 
 impl PianoScreen {
@@ -61,7 +62,7 @@ impl PianoScreen {
     pub fn new(song: song::Song) -> PianoScreen {
         let mut ps = PianoScreen {
             song,
-            mode: GameMode::Play,
+            mode: GameMode::Unset,
             play: false,
             time_offset: 0.,
             time_offset_y: 0.,
@@ -77,26 +78,29 @@ impl PianoScreen {
             text_texture_cache: HashMap::new(),
             pixels_per_second: 400.,
             default_pixels_per_second: 400.,
-            paused_on_block_group: 0,
             awaiting_piano_input: false,
             awaiting_keys: None,
             active_piano_keys: HashSet::new(),
             active_piano_keys_history: utils::ActiveKeysHistory::new(),
+            next_group: vec![],
         };
         ps.recalculate(screen_width(), screen_height());
+        ps.set_mode(GameMode::Play);
         ps
     }
 
     pub fn reset(&mut self) {
-        self.mode = GameMode::Play;
+        self.mode = GameMode::Unset;
+        self.play = false;
         self.time_offset = 0.;
         self.time_offset_y = 0.;
         self.pixels_per_second = self.default_pixels_per_second;
-        self.paused_on_block_group = 0;
         self.awaiting_piano_input = false;
         self.awaiting_keys = None;
         self.active_piano_keys.clear();
         self.active_piano_keys_history.clear();
+        self.next_group = vec![];
+        self.set_mode(GameMode::Play);
     }
 
     pub fn on_screen_resize(&mut self) {
@@ -345,6 +349,7 @@ impl PianoScreen {
                 match self.mode {
                     GameMode::Play => "play",
                     GameMode::LearnBlocking => "blocking-learn",
+                    GameMode::Unset => "unset",
                 }
             ),
             10.,
@@ -359,20 +364,14 @@ impl PianoScreen {
     }
 
     pub fn update(&mut self, frame_time: f32) {
-        let note_block_groups = self.song.all();
         self.active_piano_keys_history.autoclean();
 
-        if (self.paused_on_block_group as usize) < note_block_groups.len() {
-            let next_group = note_block_groups
-                .get(self.paused_on_block_group as usize)
-                .unwrap();
-            let next_group_start_time = next_group.first().unwrap().start_time;
-
-            // todo: make sure that this doesn't get called more than once
-            if (self.time_offset * 1_000_000.) as u32 >= next_group_start_time {
+        if self.mode == GameMode::LearnBlocking {
+            if (self.time_offset * 1_000_000.) as u32 > self.next_group.first().unwrap().start_time
+            {
+                // TODO: if we already know that the keys were recently pressed we might
+                // just continue without interruptions, for smoorther play
                 self.awaiting_piano_input = true;
-                self.awaiting_keys =
-                    Some(next_group.iter().map(|b| b.key).collect::<HashSet<Key>>());
             }
         }
 
@@ -391,7 +390,7 @@ impl PianoScreen {
         if self.awaiting_piano_input {
             if self.active_piano_keys == self.awaiting_keys.clone().unwrap() {
                 self.awaiting_piano_input = false;
-                self.paused_on_block_group += 1;
+                self.move_to_next_group();
 
                 // clear to make sure that successive piano key strokes
                 // won't be polluted with previous ones
@@ -421,10 +420,26 @@ impl PianoScreen {
         if self.mode != mode {
             self.mode = mode;
         }
+        self.move_to_next_group();
+        if self.mode == GameMode::Play {
+            self.awaiting_piano_input = false;
+        }
     }
 
-    pub fn skip_blocks(&mut self, amount: i32) {
+    fn move_to_next_group(&mut self) {
+        self.next_group = match self.song.next((self.time_offset * 1_000_000.) as u32) {
+            Some(v) => v.to_vec(),
+            None => vec![],
+        };
+        self.awaiting_keys = Some(
+            self.next_group
+                .iter()
+                .map(|b| b.key)
+                .collect::<HashSet<Key>>(),
+        );
     }
+
+    pub fn skip_blocks(&mut self, amount: i32) {}
 }
 
 impl Node for PianoScreen {

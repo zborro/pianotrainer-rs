@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
@@ -6,7 +7,7 @@ use std::path::Path;
 use midix::prelude::MetaMessage::*;
 use midix::prelude::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NoteBlock {
     pub octave: Octave,
     pub note: Note,
@@ -16,6 +17,16 @@ pub struct NoteBlock {
     pub start_time: u32,
     pub stop_time: Option<u32>,
     pub channel_number: u32,
+}
+
+impl fmt::Display for NoteBlock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(
+            f,
+            "NoteBlock({}/{}@{})",
+            self.octave, self.note, self.start_time
+        )
+    }
 }
 
 pub struct Channel {
@@ -62,6 +73,25 @@ impl Song {
         &self.note_blocks[from_ix..to_ix]
     }
 
+    pub fn next(&self, from_time: u32) -> Option<&[NoteBlock]> {
+        let mut index = -1;
+        for (i, group) in self.note_blocks.iter().enumerate() {
+            if group.is_empty() {
+                continue;
+            }
+            if group.first().unwrap().start_time > from_time {
+                index = i as i32;
+                break;
+            }
+        }
+
+        if index > 0 {
+            Some(&self.note_blocks[index as usize])
+        } else {
+            None
+        }
+    }
+
     pub fn all(&self) -> &[Vec<NoteBlock>] {
         &self.note_blocks
     }
@@ -97,7 +127,8 @@ impl Song {
                 Ok(FileEvent::Track(_)) => {}
                 Ok(FileEvent::TrackEvent(track_event)) => {
                     let dt = track_event.delta_ticks();
-                    let dt2 = dt * ((cur_us_per_quarter_note as f32 / ticks_per_quarter_note as f32) as u32);
+                    let dt2 = dt
+                        * ((cur_us_per_quarter_note as f32 / ticks_per_quarter_note as f32) as u32);
 
                     match track_event.event() {
                         TrackMessage::ChannelVoice(cv) => {
@@ -177,7 +208,10 @@ impl Song {
         let chunk_by = groups.chunk_by(|a, b| a.start_delta == b.start_delta);
 
         Song {
-            note_blocks: chunk_by.map(|x| x.to_vec()).filter(|v| !v.is_empty()).collect()
+            note_blocks: chunk_by
+                .map(|x| x.to_vec())
+                .filter(|v| !v.is_empty())
+                .collect(),
         }
     }
 }
