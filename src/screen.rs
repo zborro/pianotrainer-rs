@@ -129,6 +129,18 @@ impl PianoScreen {
         ps
     }
 
+    pub fn reset(&mut self) {
+        self.mode = GameMode::Play;
+        self.time_offset = 0.;
+        self.time_offset_y = 0.;
+        self.pixels_per_second = self.default_pixels_per_second;
+        self.paused_on_block_group = 0;
+        self.awaiting_piano_input = false;
+        self.awaiting_keys = None;
+        self.active_piano_keys.clear();
+        self.active_piano_keys_history.clear();
+    }
+
     pub fn on_screen_resize(&mut self) {
         self.recalculate(screen_width(), screen_height());
     }

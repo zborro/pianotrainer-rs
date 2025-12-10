@@ -104,6 +104,8 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
             scene::get_node(piano_screen_handle).zoom_default();
         } else if is_key_pressed(KeyCode::Equal) && is_shift_key_down {
             scene::get_node(piano_screen_handle).zoom_in();
+        } else if is_key_pressed(KeyCode::R) {
+            scene::get_node(piano_screen_handle).reset();
         }
 
         if is_key_pressed(KeyCode::M) {
