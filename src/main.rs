@@ -39,7 +39,7 @@ async fn run(midi_path: PathBuf, midi_port: String) -> Result<(), Box<dyn Error>
 
     let mut last_screen_width = screen_width();
 
-    let song = song::load_song(midi_path.as_path());
+    let song = song::Song::load(midi_path.as_path());
     let piano_screen_handle = scene::add_node(screen::PianoScreen::new(song));
 
     let in_port = midi_in.find_port_by_id(midi_port).unwrap();
