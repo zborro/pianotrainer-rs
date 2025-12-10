@@ -21,7 +21,6 @@ pub struct PianoScreen {
     time_offset: f32,
     time_offset_y: f32,
     num_white_keys: u32,
-    piano_key_margin: f32,
     white_piano_key_width: f32,
     white_piano_key_height: f32,
     black_piano_key_width: f32,
@@ -67,7 +66,6 @@ impl PianoScreen {
             time_offset: 0.,
             time_offset_y: 0.,
             num_white_keys: 52,
-            piano_key_margin: 1.,
             white_piano_key_width: 0.,
             white_piano_key_height: 0.,
             black_piano_key_width: 0.,
@@ -128,8 +126,10 @@ impl PianoScreen {
                 let note_offset = self.calc_note_offset(key);
                 let color = if self.active_piano_keys.contains(&key) {
                     RED
+                } else if black {
+                    BLACK
                 } else {
-                    if black { BLACK } else { WHITE }
+                    WHITE
                 };
 
                 draw_rectangle(
@@ -175,10 +175,7 @@ impl PianoScreen {
     }
 
     fn is_key_white(&self, key: Key) -> bool {
-        match key.byte() % 12 {
-            0 | 2 | 4 | 5 | 7 | 9 | 11 => true,
-            _ => false,
-        }
+        matches!(key.byte() % 12, 0 | 2 | 4 | 5 | 7 | 9 | 11)
     }
 
     fn calc_note_offset(&self, key: Key) -> f32 {
