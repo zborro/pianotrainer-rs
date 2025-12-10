@@ -33,7 +33,7 @@ impl ActiveKeysHistory {
 
     pub fn autoclean(&mut self) {
         self.history
-            .retain(|e| e.timestamp.elapsed().is_ok_and(|v| v.as_secs() < 2));
+            .retain(|e| e.timestamp.elapsed().is_ok_and(|v| v.as_secs() < 1));
     }
 
     pub fn clear(&mut self) {
