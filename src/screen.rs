@@ -419,7 +419,12 @@ impl PianoScreen {
     }
 
     pub fn set_mode(&mut self, mode: GameMode) {
-        self.mode = mode;
+        if self.mode != mode {
+            self.mode = mode;
+        }
+    }
+
+    pub fn skip_blocks(&mut self, amount: i32) {
     }
 }
 
