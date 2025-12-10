@@ -235,13 +235,11 @@ impl PianoScreen {
             );
         }
 
-        let song_iter = &self.song.get_iterator();
-
         let from_time = self.time_offset as u32 * 1_000_000;
         let to_time =
             from_time + (((screen_height() / self.pixels_per_second) * 1_000_000.) * 1.5) as u32;
 
-        for chunk in song_iter.range(from_time, to_time) {
+        for chunk in self.song.range(from_time, to_time) {
             for block in chunk {
                 let octave_offset = (block.octave.value() - 1) as f32 * octave_w;
                 let note_offset = self.calc_note_offset(block.key);
@@ -361,7 +359,7 @@ impl PianoScreen {
     }
 
     pub fn update(&mut self, frame_time: f32) {
-        let note_block_groups = self.song.get_note_blocks_ordered();
+        let note_block_groups = self.song.all();
         self.active_piano_keys_history.autoclean();
 
         if (self.paused_on_block_group as usize) < note_block_groups.len() {
@@ -406,6 +404,7 @@ impl PianoScreen {
         self.active_piano_keys.remove(&key);
     }
 
+    // TODO: zoom -/+ fns don't work correctly with current time_offset_y
     pub fn zoom_out(&mut self) {
         self.pixels_per_second -= 10.;
     }
