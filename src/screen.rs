@@ -1,53 +1,11 @@
 use std::collections::{HashMap, HashSet};
-use std::time::SystemTime;
 
 use macroquad::experimental::scene::{Node, RefMut};
 use macroquad::prelude::*;
 use midix::prelude::Key;
 
 use crate::song;
-
-#[derive(Hash, Eq, PartialEq)]
-pub struct KeyWithTimestamp {
-    key: Key,
-    timestamp: SystemTime,
-}
-
-pub struct ActiveKeysHistory {
-    history: HashSet<KeyWithTimestamp>,
-}
-
-impl ActiveKeysHistory {
-    pub fn new() -> Self {
-        Self {
-            history: HashSet::new(),
-        }
-    }
-
-    pub fn insert(&mut self, key: Key) {
-        self.history.insert(KeyWithTimestamp {
-            key,
-            timestamp: SystemTime::now(),
-        });
-    }
-
-    pub fn autoclean(&mut self) {
-        self.history
-            .retain(|e| e.timestamp.elapsed().is_ok_and(|v| v.as_secs() < 1));
-    }
-
-    pub fn clear(&mut self) {
-        self.history.clear();
-    }
-
-    pub fn get(&self) -> HashSet<Key> {
-        self.history.iter().map(|e| e.key).collect()
-    }
-
-    pub fn len(&self) -> usize {
-        self.get().len()
-    }
-}
+use crate::utils;
 
 #[derive(Eq, PartialEq)]
 pub enum GameMode {
@@ -77,7 +35,7 @@ pub struct PianoScreen {
     awaiting_piano_input: bool,
     awaiting_keys: Option<HashSet<Key>>,
     active_piano_keys: HashSet<Key>,
-    active_piano_keys_history: ActiveKeysHistory,
+    active_piano_keys_history: utils::ActiveKeysHistory,
 }
 
 impl PianoScreen {
@@ -123,7 +81,7 @@ impl PianoScreen {
             awaiting_piano_input: false,
             awaiting_keys: None,
             active_piano_keys: HashSet::new(),
-            active_piano_keys_history: ActiveKeysHistory::new(),
+            active_piano_keys_history: utils::ActiveKeysHistory::new(),
         };
         ps.recalculate(screen_width(), screen_height());
         ps

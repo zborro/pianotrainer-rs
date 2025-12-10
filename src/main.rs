@@ -8,6 +8,7 @@ use std::thread;
 
 mod screen;
 mod song;
+mod utils;
 
 #[derive(Parser)]
 struct Cli {
