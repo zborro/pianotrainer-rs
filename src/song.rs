@@ -73,7 +73,7 @@ impl Song {
         &self.note_blocks[from_ix..to_ix]
     }
 
-    pub fn next(&self, from_time: u32) -> Option<&[NoteBlock]> {
+    fn time_offset_to_index(&self, from_time: u32) -> i32 {
         let mut index = -1;
         for (i, group) in self.note_blocks.iter().enumerate() {
             if group.is_empty() {
@@ -84,6 +84,11 @@ impl Song {
                 break;
             }
         }
+        index
+    }
+
+    pub fn next(&self, from_time: u32) -> Option<&[NoteBlock]> {
+        let index = self.time_offset_to_index(from_time);
 
         if index > 0 {
             Some(&self.note_blocks[index as usize])
@@ -92,8 +97,9 @@ impl Song {
         }
     }
 
-    pub fn all(&self) -> &[Vec<NoteBlock>] {
-        &self.note_blocks
+    pub fn prev(&self, from_time: u32) -> Option<&[NoteBlock]> {
+        let index = std::cmp::max(0, self.time_offset_to_index(from_time) - 2);
+        Some(&self.note_blocks[index as usize])
     }
 
     pub fn load(path: &Path) -> Self {

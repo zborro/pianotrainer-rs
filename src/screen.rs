@@ -423,6 +423,19 @@ impl PianoScreen {
         }
     }
 
+    fn move_to_prev_group(&mut self) {
+        self.next_group = match self.song.prev((self.time_offset * 1_000_000.) as u32) {
+            Some(v) => v.to_vec(),
+            None => vec![],
+        };
+        self.awaiting_keys = Some(
+            self.next_group
+                .iter()
+                .map(|b| b.key)
+                .collect::<HashSet<Key>>(),
+        );
+    }
+
     fn move_to_next_group(&mut self) {
         self.next_group = match self.song.next((self.time_offset * 1_000_000.) as u32) {
             Some(v) => v.to_vec(),
@@ -440,14 +453,16 @@ impl PianoScreen {
         self.play = false;
 
         if amount < 0 {
-            println!("not implemented yet!");
+            for _ in 0..amount.abs() {
+                self.move_to_prev_group();
+            }
         } else {
             for _ in 0..amount {
                 self.move_to_next_group();
             }
-            self.time_offset = self.next_group.first().unwrap().start_time as f32 / 1_000_000.;
-            self.time_offset_y = self.time_offset * self.pixels_per_second;
         }
+        self.time_offset = self.next_group.first().unwrap().start_time as f32 / 1_000_000.;
+        self.time_offset_y = self.time_offset * self.pixels_per_second;
     }
 }
 
