@@ -56,21 +56,24 @@ impl Song {
     }
 
     pub fn range(&self, from_time: u32, to_time: u32) -> &[Vec<NoteBlock>] {
-        let mut from_ix = self.note_blocks.len();
-        let mut to_ix = 0;
+        let mut from_ix = None;
+        let mut to_ix = None;
 
         for (ix, group) in self.note_blocks.iter().enumerate() {
             if self.should_include(from_time, to_time, group) {
-                if ix < from_ix {
-                    from_ix = ix;
+                if ix < from_ix.unwrap_or(self.note_blocks.len()) {
+                    from_ix = Some(ix);
                 }
-                if ix > to_ix {
-                    to_ix = ix;
+                if ix > to_ix.unwrap_or(0) {
+                    to_ix = Some(ix);
                 }
             }
         }
 
-        &self.note_blocks[from_ix..to_ix]
+        match (from_ix, to_ix) {
+            (Some(from), Some(to)) => &self.note_blocks[from..to],
+            _ => &[]
+        }
     }
 
     fn time_offset_to_index(&self, from_time: u32) -> i32 {
